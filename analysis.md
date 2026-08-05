@@ -47,18 +47,56 @@ page, and this page lives here rather than in `HexOpt` accordingly.
 
 | Metric | Tong et al. 2024 (Table 2, "ours") | This M1 run (2026-08-04) |
 |---|---|---|
-| Vertices | 36,091 | *pending — run in progress* |
-| Elements | 30,145 | *pending* |
-| Worst scaled Jacobian | 0.560 | *pending* |
-| Best scaled Jacobian | 1.0 | *pending* |
-| Refinement level | 4 | *pending* |
-| Time | 218 s | *pending* |
+| Vertices | 36,091 | **218,898** ⚠️ |
+| Elements | 30,145 | **192,098** ⚠️ |
+| Worst scaled Jacobian | 0.560 | **0.010** ⚠️ |
+| Best scaled Jacobian | 1.0 | 1.0 |
+| Refinement level | 4 | not measured (see note below) |
+| Time | 218 s | 4109.3 s (~68.5 min), capped run ⚠️ |
 
 *(Table 2 itself lists Bottle1's vertex count as 36,091 — cross-checked
 against this repo's own README mesh-statistics table, which agrees:
 `bottle1|36091|30145|0.56`.)*
 
-### Bottle1 pipeline timings (Apple M1, in progress)
+**⚠️ These numbers do not reproduce Table 2, and not only because of the
+convergence cap.** Two separate issues, not one:
+
+1. **Mesh size is ~6x too large.** Vertex/element counts come from
+   `RemoveOutsideElement`'s output topology (`ProjectToIsoSurface` only
+   repositions points, confirmed by the killed full-budget attempt and
+   the capped rerun producing byte-identical counts) — so this mismatch
+   is present regardless of how long quality improvement runs, and isn't
+   explained by the `MAX_PROJ_ITER` cap. The same repo's own `bone`
+   sample shows the same pattern at a smaller ratio: our M1 run produced
+   19,639 vertices / 16,590 elements against this repo's own published
+   10,356 / 8,619 (~1.9x). Both runs used the shipped, unmodified
+   `VOXEL_SIZE`/`C_THRES`/`H_THRES` thresholds in `Initialization.h` — no
+   octree-depth parameter was touched. The M4 session that fixed
+   `ProjectToIsoSurface` validated the *algorithm's* convergence behavior
+   against `bone` but never checked its *output mesh size* against the
+   published number, so this gap went undetected until now. This looks
+   structurally similar to the already-documented gap in the sibling
+   `HexOpt` repo, where the publicly available code doesn't reproduce the
+   exact pipeline that generated its paper's published results — worth
+   raising with Hua Tong the same way, rather than assumed to be a local
+   bug, though it hasn't been confirmed which explanation is correct yet.
+2. **Worst SJ (0.010) reflects the deliberately-capped, under-converged
+   run** (see the `MAX_PROJ_ITER` discussion below and in the summary
+   log) — `ELEM_THRES` never advanced past its initial floor of `0.01`
+   because no checkpoint reached `badElem=0` *and* the convergence
+   tolerance simultaneously within the reduced 20-checkpoint budget, so
+   this number isn't informative about the algorithm's achievable
+   quality the way bone's 0.590 (this M1) / 0.61 (repo's published number)
+   is. Best SJ (1.0) matches regardless, since at least one element in
+   any reasonably-sized mesh tends to land near-ideal.
+
+Given finding (1), the vertex/element/worst-SJ mismatches here shouldn't
+yet be read as "the fix doesn't work" or "this M1 can't reproduce Table
+2" — they're two distinct, separable problems (mesh-size and
+convergence-budget), and the mesh-size one predates and is independent of
+anything done in this session.
+
+### Bottle1 pipeline timings (Apple M1)
 
 Per-stage timings as `HexGen` reports them (`clock()` prints, in
 `Main.cpp` and — as of this session, see summary log — inside
@@ -83,14 +121,14 @@ clearing, and projection+quality improvement.
 
 | Stage | bone (M4, 2026-07-02) | bone (M1, 2026-08-04) | Bottle1 (M1, 2026-08-04) |
 |---|---|---|---|
-| Read surface mesh | ~0.4 s (0.2%) | 0.57 s (0.1%) | 1.8 s (pending) |
+| Read surface mesh | ~0.4 s (0.2%) | 0.57 s (0.1%) | 1.79 s (0.0%) |
 | Curvature and Narrow Region Assessment | n/a¹ | 31.6 s (57.0% of combined) | n/a¹ |
 | Octree Generation (strongly balanced) | n/a¹ | 19.6 s (35.4% of combined) | n/a¹ |
-| — combined (curvature + octree), as `Main.cpp` reports it¹ | ~38–39 s (14.6%) | 55.3 s (13.4%) | **1062.2 s (~17.7 min) (pending)** |
-| Mesh Dualization | ~12–13 s (4.7%) | 17.1 s (4.1%) | **1138.9 s (~19.0 min) (pending)** |
-| Buffer Clearing | ~13 s (4.9%) | 21.7 s (5.2%) | **815.1 s (~13.6 min) (pending)** |
-| Buffer Zone Projection + Quality Improvement | ~200 s (75.6%) | **319.4 s (~5.3 min) (77.2%)** | *in progress³ — converging, see log* |
-| **Total** | **~4.5 min (264.4 s summed² ⇒ 100%)** | **419.5 s (~7.0 min, `time -l` real ⇒ 100%)** | *pending³* |
+| — combined (curvature + octree), as `Main.cpp` reports it¹ | ~38–39 s (14.6%) | 55.3 s (13.4%) | **1062.2 s (~17.7 min) (25.9%)** |
+| Mesh Dualization | ~12–13 s (4.7%) | 17.1 s (4.1%) | **1138.9 s (~19.0 min) (27.7%)** |
+| Buffer Clearing | ~13 s (4.9%) | 21.7 s (5.2%) | **815.1 s (~13.6 min) (19.8%)** |
+| Buffer Zone Projection + Quality Improvement | ~200 s (75.6%) | **319.4 s (~5.3 min) (77.2%)** | **1091.3 s (~18.2 min) (26.6%)³** |
+| **Total** | **~4.5 min (264.4 s summed² ⇒ 100%)** | **419.5 s (~7.0 min, `time -l` real ⇒ 100%)** | **4109.3 s (~68.5 min summed³ ⇒ 100%)** |
 
 ¹ The M4 bone run and the Bottle1 run both used a pre-split binary, so
 curvature/narrow-region assessment and octree balancing are only
@@ -139,25 +177,40 @@ regardless of machine.
 
 ³ Bottle1's projection stage was initially let run at bone's
 `MAX_PROJ_ITER=200000` setting like the other columns, but killed after
-24 checkpoints (~22 min) once its per-checkpoint cost became clear:
+24 checkpoints (~22 min, `maxDist=0.00473` with `badElem=0` at the last
+checkpoint before stopping) once its per-checkpoint cost became clear:
 ~56 s/checkpoint vs. bone's ~1 s/checkpoint, which extrapolated to
-several hours for the full 200-checkpoint budget. Rather than accept that
-runtime, `MAX_PROJ_ITER` was reduced to `20000` (20 checkpoints, ~19 min
-ceiling at Bottle1's observed rate) specifically for this run — a
+several hours for the full 200-checkpoint budget. `MAX_PROJ_ITER` was
+reduced to `20000` (20 checkpoints) specifically for this run — a
 deliberate speed/convergence trade-off, documented in `HexGen.cpp`'s
-comments at the constant. The killed full-budget attempt reached
-`maxDist=0.00473` with `badElem=0` at its last checkpoint before being
-stopped (log preserved as `runs/bottle1/run.log.full-attempt-killed`,
-`finalMesh.vtk.full-attempt-killed`); the capped rerun resumed from the
+comments at the constant — and the capped rerun resumed from the
 already-computed `octree.vtk`/`dualFullHex.vtk`/`dualHex.vtk` (via a
 temporary, uncommitted `Main.cpp` tweak, reverted immediately after
-launching) rather than redoing the ~50 minutes of earlier stages, so
-those four stages' timings above are unaffected by this change — only
-the projection stage and total differ from what the 200000-iteration
-attempt would have produced.
+launching) rather than redoing the ~50 minutes of earlier stages. It hit
+that reduced backstop, landing on best result `badElem=0, smallDist=
+0.62311` — genuinely under-converged compared to bone's ~1e-14 (see the
+Bottle1 results table above for what this means for the reported worst
+SJ). The killed full-budget attempt's log/mesh are preserved as
+`runs/bottle1/run.log.full-attempt-killed` /
+`finalMesh.vtk.full-attempt-killed`. Total in the table above (4109.3 s)
+sums the *first* attempt's four completed pre-projection stages (the real
+computation) plus the *capped rerun's* projection stage (1091.3 s) — the
+~22 min spent on the killed attempt's partial projection work is excluded
+as not contributing to the final result.
+
+Mesh-size and scaled-Jacobian stats (`finalMesh.vtk`'s vertex/element
+counts, worst/best SJ) are reported in the Bottle1 results table above,
+computed via a new tool, `scripts/scaled_jacobian_stats.cpp` — a
+standalone C++ program that parses a VTK hex mesh and computes min/max
+scaled Jacobian using `HexGen.cpp`'s own `Sj()` function copied verbatim
+(not reimplemented), so its output is guaranteed consistent with what
+`HexGen` itself computes internally. Validated against bone's
+`finalMesh.vtk` first (worst 0.590, best 1.0 — close to the repo's
+published 0.61 for that model) before trusting it on Bottle1.
 
 Bunny and the remaining Table 2 models will be added as their own sections
-below once Bottle1 is complete.
+below once Bottle1's open questions (mesh-size mismatch, convergence
+budget) are resolved or at least better understood.
 
 ## Summary log
 
@@ -228,9 +281,28 @@ Picking up the M4 session's fixed `HexGen.cpp` to reproduce Table 2's Bottle1 ro
   tweak, reverted immediately after launching) rather than redoing the ~50 minutes of earlier stages.
   The killed full-budget attempt's log and best mesh are preserved as
   `runs/bottle1/run.log.full-attempt-killed` / `finalMesh.vtk.full-attempt-killed` for the record.
-
-*(This log entry is being written while the Bottle1 run is still in progress; final results will be
-added to both the Bottle1 table above and this section once it finishes.)*
+- **Scaled-Jacobian stats tool**: wrote `scripts/scaled_jacobian_stats.cpp`, a standalone C++ program
+  that reads a VTK hex mesh and reports min/max scaled Jacobian using `HexGen.cpp`'s own `Sj()`
+  function copied verbatim (not reimplemented), so it can't silently diverge from what `HexGen` itself
+  computes. Validated against bone's `finalMesh.vtk` (worst 0.590, best 1.0 — close to the repo's
+  published 0.61) before trusting it on Bottle1.
+- **Result — does not reproduce Table 2, for two separable reasons, not one**: Bottle1's capped run
+  finished at 218,898 vertices / 192,098 elements, worst SJ 0.010, best SJ 1.0, total 4109.3 s
+  (~68.5 min), against Table 2's 36,091 / 30,145, [0.560; 1.0], 218 s. (1) Mesh size is ~6x too large,
+  and — confirmed by the killed full-budget attempt and the capped rerun producing byte-identical
+  vertex/element counts — this is independent of the `MAX_PROJ_ITER` cap; `RemoveOutsideElement`'s
+  output topology is what it is regardless of how long the later quality-improvement stage runs. The
+  same oversizing shows up on bone too (19,639/16,590 here vs. this repo's own published 10,356/8,619,
+  ~1.9x), and neither run touched `VOXEL_SIZE`/`C_THRES`/`H_THRES`. The M4 session validated
+  `ProjectToIsoSurface`'s convergence *behavior* against bone but never checked output mesh *size*
+  against the published number, so this predates today and went unnoticed until now — structurally
+  similar to the already-documented gap in the sibling `HexOpt` repo (public code not matching what
+  generated its paper's published results), though not yet confirmed to be the same root cause. (2)
+  Worst SJ (0.010) separately reflects the deliberately-capped, under-converged run — `ELEM_THRES`
+  never left its initial `0.01` floor — and isn't informative about the algorithm's achievable quality
+  the way bone's 0.590/0.61 is. See the Bottle1 results table above for the full breakdown; worth
+  raising the mesh-size question with Hua Tong before spending more time chasing convergence on
+  Bottle1 or moving on to Bunny.
 
 ---
 
