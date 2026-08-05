@@ -1279,6 +1279,14 @@ void hexGen::ConstructOctree() {
 	StrongBalancedOctree();
 	std::cout << "Time elapsed for octree generation (strongly balanced): "
 		<< (double)(clock() - cellValueEnd) / CLOCKS_PER_SEC << std::endl;
+	// Note (2026-08-05): counted octreeArray's true-entries before/after
+	// this balancing pass to test whether 2:1-balance propagation (not
+	// GetCellValue()'s curvature/thickness thresholds themselves) is what
+	// disproportionately inflates Bottle1's octree vs. bone's. Refuted —
+	// balancing amplifies both by a similar ~23-31%, and the ~12x
+	// Bottle1-vs-bone disparity is already fully present in the cell
+	// marks GetCellValue() produces, before this function ever runs. See
+	// analysis.md's summary log for the counts and what's still open.
 
 	octreeArray.clear(); cutArray1.clear();
 }

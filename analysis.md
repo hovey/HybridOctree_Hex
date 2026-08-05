@@ -634,8 +634,11 @@ version of `HexGen.cpp` that's public doesn't have the optimizations
 that the version used to generate Table 2 had. This isn't a mistake in
 this reproduction's methodology — it's a real, structural gap between
 the published performance numbers and the current state of the public
-code, on top of the mesh-size question (still open — see the `H_THRES`
-test immediately below, which ruled out the other obvious candidate).
+code, on top of the mesh-size question — see the `H_THRES` and
+octree-balancing tests immediately below, both of which ruled out their
+respective candidates and narrowed the mesh-size question down to
+"Bottle1's curvature/thickness candidates are more spatially dispersed
+across its geometry than bone's," not yet fully confirmed.
 
 **`H_THRES` hypothesis test (2026-08-05).** Before testing, re-read
 `GetCellValue()`'s thickness computation (`HexGen.cpp:936-985`) against
@@ -682,6 +685,52 @@ octree-orientation-vs-geometry effect like the paper's own oil-pump
 discussion) not captured by either threshold at all. This remains open;
 `bottle1-h-thres-test/` and `build-h-thres-test/` were both deleted after
 capturing the result (throwaway experiment, not meaningful to preserve).
+
+**Octree-balancing hypothesis tested and refuted (2026-08-05).** Tested
+candidate (a) above: does `StrongBalancedOctree()`'s 2:1 balancing pass
+propagate refinement far beyond what `GetCellValue()` initially flags,
+disproportionately for Bottle1? Instrumented `ConstructOctree()`
+(temporarily) to count `octreeArray`'s true-entries immediately before
+and after the balancing call, run cheaply on both models
+(octree-construction-only, killed right after — `bone` finishes in
+~1 min, Bottle1 in ~17 min):
+
+| | Before balancing | After balancing | Amplification |
+|---|---|---|---|
+| bone | 2,777 | 3,633 | +30.8% |
+| Bottle1 | 34,785 | 42,937 | +23.4% |
+
+**Refuted, decisively.** Balancing amplifies bone *more* than Bottle1 in
+relative terms (+30.8% vs. +23.4%), the opposite of what the hypothesis
+predicted. More importantly: the Bottle1-vs-bone disparity is already
+almost fully present *before* balancing ever runs (34,785/2,777 ≈ 12.53x)
+and barely changes after it (42,937/3,633 ≈ 11.82x) — closely matching
+the final octree's own ~11.7x disparity (358,307 vs. 30,733 points, from
+the earlier `octree.vtk` comparison). So the entire disproportion
+originates in `GetCellValue()`'s initial cell-marking, not in balancing
+propagation. Since neither `C_THRES` nor `H_THRES`, tuned individually,
+explains that marking disparity either (both tested and refuted above),
+the likely remaining explanation is candidate (b): Bottle1's raw
+curvature/thickness candidate lists are only ~3x larger than bone's (from
+the earlier `GetCellValue()` diagnostic — `refineTriPt0` raw: 41,442 vs.
+12,959), but produce a ~12x larger marked-cell count — meaning those
+candidates are more spatially *dispersed* across Bottle1's more elongated,
+coiled geometry, touching many more distinct octree cells rather than
+clustering within a smaller set of them the way bone's more compact
+shape's candidates would. If so, this isn't a fixable threshold-tuning
+bug at all — it may be a genuine, correct consequence of applying this
+octree strategy to an elongated/coiled shape, and reproducing Table 2's
+mesh size for Bottle1 specifically might require a different mechanism
+entirely (spatially-adaptive thresholds, or whatever Tong's original,
+non-public implementation actually did) rather than anything tunable in
+the current public code. Not yet confirmed — would need to inspect the
+spatial distribution of `refineTri0`/`refineTriPt0` directly (e.g.
+bounding-box coverage as a fraction of the model's overall extent) to
+verify the dispersion theory rather than infer it from these aggregate
+counts alone. The temporary `octreeArray` count instrumentation has been
+removed from `HexGen.cpp`, replaced with a short permanent comment
+pointing to this finding; `diag-balance-bone/`/`diag-balance-bottle1/`
+and `build-balance-test/` were deleted after capturing the result.
 
 ### 2026-08-04 — Bottle1 reproduction attempt + timing instrumentation (Apple M1)
 
