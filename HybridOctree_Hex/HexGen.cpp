@@ -1,4 +1,6 @@
 #include "HexGen.h"
+#include <ctime>// clock()/CLOCKS_PER_SEC, for the per-substage timing added to
+                 // ConstructOctree() below
 double ELEM_THRES = 0.01;// element floating quality threshold
 int octreeENum; int hexMeshENum;
 
@@ -1244,8 +1246,28 @@ inline void hexGen::ComputeCellValue(int octreeId, int level) {
 }
 
 void hexGen::ConstructOctree() {
+	// Split into two timed substages (2026-08-04, see analysis.md's summary
+	// log) so the reproduction write-up can report curvature/narrow-region
+	// assessment separately from octree balancing, instead of Main.cpp's
+	// single coarse "Time elapsed for constructing octree" covering both:
+	//   1. GetCellValue(): curvature- and thickness-driven adaptive
+	//      refinement — decides which octree cells need refining based on
+	//      surface curvature and narrow-region (thin-wall) detection.
+	//   2. StrongBalancedOctree(): enforces the 2:1 balance constraint
+	//      across the resulting octree (refines any cell whose neighbor is
+	//      more than one level finer), independent of curvature/thickness.
+	// Only affects runs made with this build or later — it can't
+	// retroactively split timing already captured by an earlier run.
+	clock_t cellValueStart = clock();
 	GetCellValue();
+	clock_t cellValueEnd = clock();
+	std::cout << "Time elapsed for curvature and narrow region assessment: "
+		<< (double)(cellValueEnd - cellValueStart) / CLOCKS_PER_SEC << std::endl;
+
 	StrongBalancedOctree();
+	std::cout << "Time elapsed for octree generation (strongly balanced): "
+		<< (double)(clock() - cellValueEnd) / CLOCKS_PER_SEC << std::endl;
+
 	octreeArray.clear(); cutArray1.clear();
 }
 

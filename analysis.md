@@ -60,31 +60,97 @@ against this repo's own README mesh-statistics table, which agrees:
 
 ### Bottle1 pipeline timings (Apple M1, in progress)
 
-Per-stage timings as `HexGen` reports them (`std::chrono`/`clock()` prints
-in `Main.cpp`), updated live as the run progresses. Table 2 only reports
-one aggregate "Time" column; this breakdown is finer-grained than the
-paper provides, for our own diagnostic purposes.
+Per-stage timings as `HexGen` reports them (`clock()` prints, in
+`Main.cpp` and — as of this session, see summary log — inside
+`ConstructOctree()` itself), updated live as the run progresses. Table 2
+only reports one aggregate "Time" column; this breakdown is finer-grained
+than the paper provides, for our own diagnostic purposes. Headings match
+the paper's own algorithmic narrative (curvature/narrow-region assessment
+→ octree generation → dualization → buffer clearing → buffer-zone
+projection/quality improvement).
 
-| Stage | bone (M4, 2026-07-02 reference run) | Bottle1 (M1, 2026-08-04) |
+| Stage | bone (M4 reference run) | Bottle1 (M1, 2026-08-04) |
 |---|---|---|
 | Read surface mesh | ~0.4 s | 1.8 s |
-| Construct octree | ~38–39 s | **1062.2 s (~17.7 min)** |
-| Generate dual mesh (`DualFullHexMeshExtraction`) | ~12–13 s | *in progress* |
-| Extract interior dual mesh (`RemoveOutsideElement`) | ~13 s | *pending* |
-| Project to iso-surface / quality improvement (`ProjectToIsoSurface`) | ~200 s | *pending* |
+| Curvature and Narrow Region Assessment + Octree Generation (strongly balanced)¹ | ~38–39 s | **1062.2 s (~17.7 min)** |
+| Mesh Dualization | ~12–13 s | **1138.9 s (~19.0 min)** |
+| Buffer Clearing | ~13 s | *pending* |
+| Buffer Zone Projection + Quality Improvement | ~200 s | *pending* |
 | **Total** | **~4.5 min** | *pending* |
+
+¹ Reported as one combined number for both of these runs — both predate
+the timing-instrumentation split added later in this session (see summary
+log), which separates curvature/narrow-region assessment from octree
+balancing into two independently-timed stages for future runs (Bunny,
+etc.), not retroactively for this one.
 
 Octree construction alone is already ~28x longer than bone's, despite
 Bottle1 targeting only ~3.5x more elements (30,145 vs. 8,619) — plausibly
 because Bottle1's thin, coiled surface detail (handle/spiral thread, see
 Fig. 6(a) in the paper) triggers much deeper curvature-driven octree
 refinement than bone's simpler shape, rather than octree construction time
-scaling with output element count.
+scaling with output element count. Dualization is even more extreme —
+**~87x** longer than bone's — despite operating on an octree whose leaf
+count, while not directly reported, is presumably driven by that same
+deeper refinement.
 
 Bunny and the remaining Table 2 models will be added as their own sections
 below once Bottle1 is complete.
 
 ## Summary log
+
+Entries are ordered most recent first.
+
+### 2026-08-04 — Bottle1 reproduction attempt + timing instrumentation (Apple M1)
+
+Picking up the M4 session's fixed `HexGen.cpp` to reproduce Table 2's Bottle1 row on a second machine
+(Apple M1), as the first of the Table 2 models to attempt (Bunny and others to follow).
+
+- Cloned this fork to `~/HybridOctree_Hex` on the M1 (this analysis started out drafted in the sibling
+  `~/HexOpt` repo, then moved here once it became clear the reproduction work has no dependency on
+  `HexOpt` and belongs with the code it's about); added an `upstream` remote pointing at
+  `CMU-CBML/HybridOctree_Hex`.
+- Found this fork already contained the M4 session's `ProjectToIsoSurface` fix (commit `25adad9`,
+  described in full below) plus that session's `bone` run artifacts and a large amount of committed
+  CMake build cruft (binary caches, `.o` files, machine-specific `CMakeCache.txt` paths, ~600K lines of
+  generated VTK output).
+- CMake requirement is 3.27.4; this M1 had 3.24.2 installed (from an earlier, unrelated `HexOpt` build
+  session). `brew upgrade cmake` → 4.4.2.
+- Built into a fresh, separate directory (`build-m1-bottle1/`) rather than reusing the M4 session's
+  `HybridOctree_Hex/build/`, to avoid clobbering the `bone` run's evidence still sitting there. Builds
+  cleanly — same cosmetic warnings as the M4 session (`#endif` extra tokens, `RAND_MAX` narrowing,
+  dangling-else).
+- Fetched `input boundaries/bottle1_tri.raw` (14,833 vertices / 29,664 triangles) from upstream into a
+  dedicated run directory, `runs/bottle1/model.raw`, and launched the full pipeline against it. The M4
+  session's fix was verified only against `bone` (8,619 target elements); Bottle1 targets ~30,145
+  (~3.5x larger), so timing and convergence behavior weren't assumed to carry over directly.
+- **History cleanup**: rewrote this fork's `main` (`git reset --soft` to the pre-`25adad9` upstream tip,
+  then re-committed only the real source fix, the reference PDFs, and the `bone` sample data, dropping
+  the build cruft; force-pushed) so the ~600K lines of binary/build artifacts from the M4 session no
+  longer live in history at all, not just the working tree. Added `.gitignore` entries for `build/` and
+  `build-*/` so it can't happen again. Verified `HexGen.cpp`'s fix content is byte-identical before and
+  after the rewrite.
+- **Timing instrumentation**: split `ConstructOctree()` (`HexGen.cpp`) into two separately-timed,
+  separately-printed sub-stages, so the reproduction write-up can report curvature/narrow-region
+  assessment separately from octree balancing instead of Main.cpp's one coarse "constructing octree"
+  number — matching the paper's own algorithmic narrative and the headings used in the pipeline-timings
+  table above. `GetCellValue()` (curvature-/thickness-driven adaptive refinement decisions) is now
+  timed and printed as "curvature and narrow region assessment"; `StrongBalancedOctree()` (enforcing
+  the octree's 2:1 balance constraint) as "octree generation (strongly balanced)". Buffer-zone
+  projection and quality improvement remain one combined number, since `ProjectToIsoSurface()`
+  interleaves both inside the same per-checkpoint loop with no code-level seam to split them — see
+  comments in `HexGen.cpp` at both sites for the full reasoning. Sanity-checked against `bone_tri.raw`
+  in a throwaway run (`build-instrumented/`, killed once the new prints were confirmed correct, not
+  counted as a real timing sample): curvature/narrow-region assessment 31.7s + octree balancing 22.4s ≈
+  58.2s, matching Main.cpp's own unchanged coarse timer to within `clock()` rounding and cleanup-call
+  overhead. This only applies to runs made with the rebuilt binary or later — it can't retroactively
+  split the Bottle1 octree time already captured above (1062.2 s), which stays reported as one combined
+  number for this run.
+
+*(This log entry is being written while the Bottle1 run is still in progress; final results will be
+added to both the Bottle1 table above and this section once it finishes.)*
+
+---
 
 ### 2026-07-02 – 2026-07-03 — macOS build & `ProjectToIsoSurface` fix (Apple M4)
 
@@ -275,33 +341,3 @@ This is a self-contained, hand-rolled implementation of the same primal-octree �
 - Removed (stale, Windows-generated, not usable on macOS): `HybridOctree_Hex/CMakeCache.txt`,
   `HybridOctree_Hex/Makefile`, `HybridOctree_Hex/cmake_install.cmake`, `HybridOctree_Hex/CMakeFiles/`.
 - `HybridOctree_Hex/CMakeLists.txt` — unchanged, worked as-is once the stale cache was cleared.
-
----
-
-### 2026-08-04 — Bottle1 reproduction attempt (Apple M1)
-
-Picking up the M4 session's fixed `HexGen.cpp` to reproduce Table 2's Bottle1 row on a second machine
-(Apple M1), as the first of the Table 2 models to attempt (Bunny and others to follow).
-
-- Cloned this fork to `~/HybridOctree_Hex` on the M1 (this analysis started out drafted in the sibling
-  `~/HexOpt` repo, then moved here once it became clear the reproduction work has no dependency on
-  `HexOpt` and belongs with the code it's about); added an `upstream` remote pointing at
-  `CMU-CBML/HybridOctree_Hex`.
-- Found this fork already contained the M4 session's `ProjectToIsoSurface` fix (commit `25adad9`,
-  described in full above) plus that session's `bone` run artifacts and a large amount of committed
-  CMake build cruft (binary caches, `.o` files, machine-specific `CMakeCache.txt` paths, ~600K lines of
-  generated VTK output) — not something to repeat for this session's work.
-- CMake requirement is 3.27.4; this M1 had 3.24.2 installed (from an earlier, unrelated `HexOpt` build
-  session). `brew upgrade cmake` → 4.4.2.
-- Built into a fresh, separate directory (`build-m1-bottle1/`) rather than reusing the M4 session's
-  `HybridOctree_Hex/build/`, to avoid clobbering the `bone` run's evidence still sitting there. Builds
-  cleanly — same cosmetic warnings as the M4 session (`#endif` extra tokens, `RAND_MAX` narrowing,
-  dangling-else).
-- Fetched `input boundaries/bottle1_tri.raw` (14,833 vertices / 29,664 triangles) from upstream into a
-  dedicated run directory, `runs/bottle1/model.raw`.
-- Launched the full pipeline against Bottle1. The M4 session's fix was verified only against `bone`
-  (8,619 target elements); Bottle1 targets ~30,145 (~3.5x larger), so timing and convergence behavior
-  aren't assumed to carry over directly — *(results below, filled in once the run completes)*.
-
-*(This log entry is being written while the Bottle1 run is still in progress; results and final stats
-will be added to both this section and the Bottle1 table above once it finishes.)*
