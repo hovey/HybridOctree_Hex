@@ -170,56 +170,62 @@ report a value for that cell.)*
 
 ## Bottle1 (Genus-1)
 
-| Metric | Tong et al. 2024 (Table 2, "ours") | This M1 run (2026-08-04) |
-|---|---|---|
-| Vertices | 36,091 | **218,898** ⚠️ |
-| Elements | 30,145 | **192,098** ⚠️ |
-| Worst scaled Jacobian | 0.560 | **0.010** ⚠️ |
-| Best scaled Jacobian | 1.0 | 1.0 |
-| Refinement level | 4 | not measured (see note below) |
-| Time | 218 s | 4109.3 s (~68.5 min), capped run ⚠️ |
+| Metric | Tong et al. 2024 (Table 2) | 2026-08-04 (buggy `C_THRES`, capped) | 2026-08-05 (calibrated `C_THRES`, full budget) |
+|---|---|---|---|
+| Vertices | 36,091 | 218,898 ⚠️ | **212,990** ⚠️ |
+| Elements | 30,145 | 192,098 ⚠️ | **186,832** ⚠️ |
+| Worst scaled Jacobian | 0.560 | 0.010 (capped) | **0.530** ✓ close |
+| Best scaled Jacobian | 1.0 | 1.0 | 1.0 |
+| Refinement level | 4 | not measured | not measured (see note below) |
+| Time | 218 s | 4109.3 s (~68.5 min) | **12590.2 s (~209.8 min real; ~142.3 min active compute — see note below)** ⚠️ |
 
 *(Table 2 itself lists Bottle1's vertex count as 36,091 — cross-checked
 against this repo's own README mesh-statistics table, which agrees:
 `bottle1|36091|30145|0.56`.)*
 
-**⚠️ These numbers do not reproduce Table 2, and not only because of the
-convergence cap.** Two separate issues, not one:
+**2026-08-05 update — convergence is fixed, mesh size and timing are
+not.** With `C_THRES` recalibrated and the full `MAX_PROJ_ITER=200000`
+budget restored, the run converged excellently: `badElem=0,
+smallDist=3.76×10⁻¹¹` — essentially machine precision, and worst SJ
+(0.530) landed close to Table 2's 0.560. That confirms the earlier
+0.010 was purely the deliberate `MAX_PROJ_ITER=20000` cap (2026-08-04),
+not an algorithm problem — resolved.
 
-1. **Mesh size is ~6x too large.** Vertex/element counts come from
-   `RemoveOutsideElement`'s output topology (`ProjectToIsoSurface` only
-   repositions points, confirmed by the killed full-budget attempt and
-   the capped rerun producing byte-identical counts) — so this mismatch
-   is present regardless of how long quality improvement runs, and isn't
-   explained by the `MAX_PROJ_ITER` cap. The same repo's own `bone`
-   sample shows the same pattern at a smaller ratio: our M1 run produced
-   19,639 vertices / 16,590 elements against this repo's own published
-   10,356 / 8,619 (~1.9x). Both runs used the shipped, unmodified
-   `VOXEL_SIZE`/`C_THRES`/`H_THRES` thresholds in `Initialization.h` — no
-   octree-depth parameter was touched. The M4 session that fixed
-   `ProjectToIsoSurface` validated the *algorithm's* convergence behavior
-   against `bone` but never checked its *output mesh size* against the
-   published number, so this gap went undetected until now.
-   **Root-caused 2026-08-05 — not a HexOpt-style missing-code gap after
-   all; see that day's summary log entry**: the shipped `C_THRES` curvature
-   thresholds don't match the paper's stated values, and separately, this
-   codebase's actual curvature computation doesn't match the paper's
-   stated formula either. Fixed by empirical recalibration (see below).
-2. **Worst SJ (0.010) reflects the deliberately-capped, under-converged
-   run** (see the `MAX_PROJ_ITER` discussion below and in the summary
-   log) — `ELEM_THRES` never advanced past its initial floor of `0.01`
-   because no checkpoint reached `badElem=0` *and* the convergence
-   tolerance simultaneously within the reduced 20-checkpoint budget, so
-   this number isn't informative about the algorithm's achievable
-   quality the way bone's 0.590 (this M1) / 0.61 (repo's published number)
-   is. Best SJ (1.0) matches regardless, since at least one element in
-   any reasonably-sized mesh tends to land near-ideal.
+**But mesh size barely moved** — 218,898 → 212,990 vertices, only a
+~2.7% reduction — despite the same `C_THRES` fix taking `bone` from
+19,639 → 14,856 vertices (a ~24% reduction, into a good match against
+its published stats; see the Bone section below). This is a new,
+unexplained finding: `C_THRES` (curvature) clearly isn't the dominant
+octree-refinement driver for Bottle1 the way it is for `bone`. The
+leading hypothesis, not yet confirmed: `H_THRES` (thickness/narrow-region
+thresholds, `{16,8,4,2,1}`, unchanged from the shipped values and already
+matching the paper exactly) may be the dominant driver for Bottle1
+specifically, given its thin coiled/spiral surface detail (the paper's
+own Fig. 6(a) zoom-in) — the same narrow-region mechanism the paper's own
+text calls out for the oil pump model needing extra refinement. This
+hasn't been tested (would mean tuning `H_THRES` against a paper formula
+that, per the curvature-formula finding above, doesn't necessarily even
+correspond to what this codebase computes for thickness either — not yet
+checked).
 
-Given finding (1), the vertex/element/worst-SJ mismatches here shouldn't
-yet be read as "the fix doesn't work" or "this M1 can't reproduce Table
-2" — they're two distinct, separable problems (mesh-size and
-convergence-budget), and the mesh-size one predates and is independent of
-anything done in this session.
+**Timing**: `/usr/bin/time -l`'s wall-clock ("real") total was 12590.2s
+(~209.8 min), but the sum of `HexGen`'s own internal stage timers only
+accounts for 8537.8s (~142.3 min) — a ~4052s (~67.5 min) gap. Traced to a
+system sleep during the run: `caffeinate` (keeping the Mac awake) died
+partway through and wasn't immediately relaunched, so part of the "3+
+hours" included the machine being asleep, not active computation.
+~142.3 min of actual compute time is the more meaningful number to
+compare against Table 2's 218s — still roughly **39x** longer, and per
+the summary log's synthesis below, not something `C_THRES` calibration
+was ever going to fix (that's a mesh-*quality*/*size* tuning constant,
+disconnected from the `ComputeCellValue()` performance bottleneck driving
+the timing gap).
+
+Given all this, the vertex/element/timing mismatches here shouldn't be
+read as "the fix doesn't work" — quality/convergence *is* fixed, cleanly.
+Mesh size and timing are separate, still-open problems, and the timing
+one in particular looks structural (see the summary log's synthesis) —
+not something further `C_THRES` tuning is likely to resolve on its own.
 
 ### Bottle1 pipeline timings (Apple M1)
 
@@ -244,16 +250,16 @@ would double-count that time — so the 100% breakdown for each column
 comes from exactly five rows: read, combined octree, dualization, buffer
 clearing, and projection+quality improvement.
 
-| Stage | bone (M4, 2026-07-02) | bone (M1, 2026-08-04) | Bottle1 (M1, 2026-08-04) |
-|---|---|---|---|
-| Read surface mesh | ~0.4 s (0.2%) | 0.57 s (0.1%) | 1.79 s (0.0%) |
-| Curvature and Narrow Region Assessment | n/a¹ | 31.6 s (57.0% of combined) | n/a¹ |
-| Octree Generation (strongly balanced) | n/a¹ | 19.6 s (35.4% of combined) | n/a¹ |
-| — combined (curvature + octree), as `Main.cpp` reports it¹ | ~38–39 s (14.6%) | 55.3 s (13.4%) | **1062.2 s (~17.7 min) (25.9%)** |
-| Mesh Dualization | ~12–13 s (4.7%) | 17.1 s (4.1%) | **1138.9 s (~19.0 min) (27.7%)** |
-| Buffer Clearing | ~13 s (4.9%) | 21.7 s (5.2%) | **815.1 s (~13.6 min) (19.8%)** |
-| Buffer Zone Projection + Quality Improvement | ~200 s (75.6%) | **319.4 s (~5.3 min) (77.2%)** | **1091.3 s (~18.2 min) (26.6%)³** |
-| **Total** | **~4.5 min (264.4 s summed² ⇒ 100%)** | **419.5 s (~7.0 min, `time -l` real ⇒ 100%)** | **4109.3 s (~68.5 min summed³ ⇒ 100%)** |
+| Stage | bone (M4, 2026-07-02) | bone (M1, 2026-08-04) | Bottle1 (M1, 2026-08-04, buggy `C_THRES`, capped) | Bottle1 (M1, 2026-08-05, calibrated `C_THRES`, full budget) |
+|---|---|---|---|---|
+| Read surface mesh | ~0.4 s (0.2%) | 0.57 s (0.1%) | 1.79 s (0.0%) | 1.90 s (0.0%) |
+| Curvature and Narrow Region Assessment | n/a¹ | 31.6 s (57.0% of combined) | n/a¹ | 725.0 s (71.6% of combined) |
+| Octree Generation (strongly balanced) | n/a¹ | 19.6 s (35.4% of combined) | n/a¹ | 43.9 s (4.3% of combined) |
+| — combined (curvature + octree), as `Main.cpp` reports it¹ | ~38–39 s (14.6%) | 55.3 s (13.4%) | **1062.2 s (~17.7 min) (25.9%)** | **1012.4 s (~16.9 min) (11.9%)** |
+| Mesh Dualization | ~12–13 s (4.7%) | 17.1 s (4.1%) | **1138.9 s (~19.0 min) (27.7%)** | **1045.8 s (~17.4 min) (12.2%)** |
+| Buffer Clearing | ~13 s (4.9%) | 21.7 s (5.2%) | **815.1 s (~13.6 min) (19.8%)** | **785.0 s (~13.1 min) (9.2%)** |
+| Buffer Zone Projection + Quality Improvement | ~200 s (75.6%) | **319.4 s (~5.3 min) (77.2%)** | **1091.3 s (~18.2 min) (26.6%)³** | **5692.8 s (~94.9 min) (66.7%)⁴** |
+| **Total** | **~4.5 min (264.4 s summed² ⇒ 100%)** | **419.5 s (~7.0 min, `time -l` real ⇒ 100%)** | **4109.3 s (~68.5 min summed³ ⇒ 100%)** | **8537.8 s (~142.3 min summed active compute ⇒ 100%)⁴** |
 
 ¹ The M4 bone run and the Bottle1 run both used a pre-split binary, so
 curvature/narrow-region assessment and octree balancing are only
@@ -332,6 +338,25 @@ scaled Jacobian using `HexGen.cpp`'s own `Sj()` function copied verbatim
 `HexGen` itself computes internally. Validated against bone's
 `finalMesh.vtk` first (worst 0.590, best 1.0 — close to the repo's
 published 0.61 for that model) before trusting it on Bottle1.
+
+⁴ The 2026-08-05 `bottle1-v3` run (calibrated `C_THRES`, full
+`MAX_PROJ_ITER=200000` budget) ran for `/usr/bin/time -l`'s reported
+12590.2s "real" — but the sum of `HexGen`'s own internal stage timers
+only accounts for 8537.8s, a ~4052s (~67.5 min) gap. Traced to a system
+sleep during the run (`caffeinate`, keeping the Mac awake, died partway
+through per `pmset -g log` and wasn't immediately relaunched) — part of
+the raw wall-clock duration was the machine asleep, not computation. The
+table above uses the summed 8537.8s (active compute only) as each
+stage's percentage denominator, consistent with how the other columns'
+percentages are computed from their own summed/reported stage times
+rather than a raw wall-clock figure that could include idle gaps. The
+projection stage converged excellently despite the sleep interruption —
+`badElem=0, smallDist=3.76×10⁻¹¹`, essentially machine precision — but
+mesh size barely changed from the buggy 2026-08-04 run (218,898 →
+212,990 vertices, ~2.7% smaller) despite `C_THRES` recalibration, unlike
+`bone`'s ~24% reduction with the same fix; see the Bottle1 results table
+above and the summary log's synthesis below for the still-open
+`H_THRES` hypothesis this raises.
 
 Bunny and the remaining Table 2 models will be added as their own sections
 below once Bottle1's open questions (mesh-size mismatch, convergence
@@ -512,58 +537,75 @@ implementation, entirely unrelated to `C_THRES` calibration — it would
 affect any sufficiently geometrically complex input model, not just
 Bottle1, since it's driven by how much of the octree needs deep
 refinement, not by input triangle count directly. The diagnostic
-`clock()`/`std::cout` instrumentation added to isolate this
-(`HexGen.cpp`, marked `TEMPORARY` in comments) is still in place pending a
-decision on next steps — not yet removed or built into a permanent fix.
-Both Bottle1 reruns from this session (`runs/bottle1-v2/`, killed
-mid-run; `runs/diag-bottle1/`, killed once diagnostic data was captured)
-are being kept alongside the 2026-08-04 `runs/bottle1/` as before/after
-evidence.
+`clock()`/`std::cout` instrumentation used to isolate this has since been
+removed from `HexGen.cpp` (its purpose served — see the commit removing
+it), replaced with a short permanent comment at the `ComputeCellValue()`
+call site pointing back to this finding. Both Bottle1 reruns from this
+session (`runs/bottle1-v2/`, killed mid-run; `runs/diag-bottle1/`, killed
+once diagnostic data was captured) are being kept alongside the
+2026-08-04 `runs/bottle1/` and the final `runs/bottle1-v3/` as
+before/after evidence.
 
-**Synthesis: why Bottle1 has been so hard to reproduce.** With the
+**Synthesis: why Bottle1 has been so hard to reproduce.** The
 `bottle1-v3` run (calibrated `C_THRES`, full `MAX_PROJ_ITER=200000`
-budget) still running past 3 hours and not yet finished — against Table
-2's reported 218s — it's worth stepping back and separating what's
-actually been fixed from what hasn't.
+budget) has now finished — 8537.8s (~142.3 min) active compute (see
+footnote 4 above for the wall-clock-vs-active-compute distinction) —
+against Table 2's reported 218s. Worth stepping back and separating
+what's actually been fixed from what hasn't.
 
-*Two genuinely different problems, not one.* Mesh size (fixed, mostly)
-and runtime (still unsolved) turned out to be almost entirely
-independent. Fixing one didn't fix the other, which is itself
-informative.
+*Three separable problems, not one.* Convergence quality (fixed,
+cleanly), mesh size (fixed, partially — see below, this turned out to be
+more complicated than first thought), and runtime (still unsolved) are
+close to independent of each other. Fixing one didn't fix the others.
 
-*Mesh size — root-caused and mostly fixed (see above).* The shipped
-`C_THRES` didn't match the paper's stated values, and separately, the
-codebase's actual curvature formula doesn't match the paper's stated
-formula either (a different, unnormalized quantity — no valid unit
-conversion between the two). Empirical recalibration against `bone`'s
-known-good published stats got size within ~1.5x and worst-SJ within
-0.01 — good enough, not exact, and exact reproduction was never really
-achievable this way without rewriting the curvature computation itself.
+*Convergence — fixed cleanly.* `badElem=0, smallDist=3.76×10⁻¹¹`,
+essentially machine precision. Worst SJ (0.530) landed close to Table
+2's 0.560. The earlier 0.010 (2026-08-04) was purely the deliberate
+`MAX_PROJ_ITER=20000` cap, not an algorithm problem.
 
-*Runtime — this is the real story, and it's not explained by the mesh-size
-fix.* Fixing `C_THRES` barely moved the needle on runtime. Comparing
-`bone` (properly calibrated) against Bottle1 (also properly calibrated),
-same code, same machine:
+*Mesh size — root-caused, but the fix barely worked for Bottle1
+specifically.* The shipped `C_THRES` didn't match the paper's stated
+values, and separately, the codebase's actual curvature formula doesn't
+match the paper's stated formula either (a different, unnormalized
+quantity — no valid unit conversion between the two). Empirical
+recalibration against `bone`'s known-good published stats got `bone`'s
+size within ~1.5x — but the *same* recalibrated `C_THRES` only took
+Bottle1 from 218,898 → 212,990 vertices, a ~2.7% reduction, nowhere near
+`bone`'s ~24% improvement with the identical fix. That's a new, still-open
+finding: `C_THRES` (curvature) isn't the dominant octree-refinement
+driver for Bottle1 the way it is for `bone`. Leading hypothesis, not yet
+tested: `H_THRES` (thickness/narrow-region, unchanged, already matching
+the paper's stated values) may dominate for Bottle1 given its thin
+coiled/spiral surface detail — the same narrow-region mechanism the paper
+calls out for the oil pump model needing extra refinement.
+
+*Runtime — the real story, and not explained by either fix above.*
+Comparing `bone` (calibrated) against Bottle1 (calibrated), same code,
+same machine:
 
 | Stage | bone (calibrated) | Bottle1 (calibrated) | Ratio |
 |---|---|---|---|
 | Octree construction | ~55 s | ~1012 s | ~18x |
 | Dual mesh generation | ~7 s | ~1046 s | ~150x |
 | Buffer clearing | ~8–22 s | ~785 s | ~36–100x |
-| Projection/quality | ~238 s | still running after 3+ hours | — |
-| **Total** | **~5.2 min** | **3+ hours and counting** | — |
+| Projection/quality | ~238 s | ~5693 s (~94.9 min) | ~24x |
+| **Total** | **~5.2 min** | **~142.3 min active compute** | **~27x** |
 
 Bottle1 only has 2.45x more input triangles than bone. None of these
 ratios are anywhere close to 2.45x, or even the ~6x naive O(n²)-in-
-triangle-count reasoning would predict. The confirmed cause (not
-guessed — see the `ComputeCellValue()` instrumentation above) is that
-octree-cell classification does a brute-force linear scan with no
-spatial acceleration structure, and both the number of cells needing
-classification and the candidate-list sizes are inflated by Bottle1's
-more complex geometry, compounding multiplicatively. Dualization and
-buffer-clearing show the same disproportionate pattern and likely hide
-similar unaccelerated scans, though those haven't been isolated with
-the same direct instrumentation yet.
+triangle-count reasoning would predict. The confirmed cause for octree
+construction specifically (not guessed — see the `ComputeCellValue()`
+instrumentation above) is that octree-cell classification does a
+brute-force linear scan with no spatial acceleration structure, and both
+the number of cells needing classification and the candidate-list sizes
+are inflated by Bottle1's more complex geometry, compounding
+multiplicatively. Dualization and buffer-clearing show the same
+disproportionate pattern and likely hide similar unaccelerated scans,
+though those haven't been isolated with the same direct instrumentation
+yet. Projection/quality's ~24x, by contrast, is largely just iteration
+count — a much larger mesh takes more `gradient()`/redistribution passes
+to reach the same convergence quality, a more "expected" kind of slowdown
+than the other three stages' scaling.
 
 *Why 218s is probably unreachable with the current public code at all.*
 Even a "perfectly calibrated" run of the current public code cannot
@@ -585,8 +627,8 @@ version of `HexGen.cpp` that's public doesn't have the optimizations
 that the version used to generate Table 2 had. This isn't a mistake in
 this reproduction's methodology — it's a real, structural gap between
 the published performance numbers and the current state of the public
-code, on top of the separate (now largely resolved) mesh-size
-calibration issue.
+code, on top of the mesh-size question (now narrowed to a `C_THRES`-vs-
+`H_THRES` question rather than fully resolved).
 
 ### 2026-08-04 — Bottle1 reproduction attempt + timing instrumentation (Apple M1)
 
