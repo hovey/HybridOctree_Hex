@@ -76,96 +76,97 @@ all of these are open access).
 
 Each model gets its own mini-table below (Method / Vertices / Elements /
 Worst SJ / Best SJ / Refinement Level / Time), in the paper's own Table 2
-order.
+order. Time (min) is Time (s) ÷ 60, added here — not in the original
+table — for readability on the slower rows.
 
-### Bottle1 (Genus-1)
+### 1. Bottle1 (Genus-1)
 
-| Method | Vertices | Elements | Worst SJ | Best SJ | Refinement Level | Time (s) |
-|---|---|---|---|---|---|---|
-| [Gao 2019](https://cims.nyu.edu/gcl/papers/2019-OctreeMeshing.pdf) | 39,326 | 33,635 | 0.181 | 0.999 | 4 | 8,175 |
-| **[Tong 2024](https://arxiv.org/pdf/2401.05984)** | **36,091** | **30,145** | **0.560** | **1.0** | **4** | **218** |
+| Method | Vertices | Elements | Worst SJ | Best SJ | Refinement Level | Time (s) | Time (min) |
+|---|---|---|---|---|---|---|---|
+| [Gao 2019](https://cims.nyu.edu/gcl/papers/2019-OctreeMeshing.pdf) | 39,326 | 33,635 | 0.181 | 0.999 | 4 | 8,175 | 136.3 |
+| **[Tong 2024](https://arxiv.org/pdf/2401.05984)** | **36,091** | **30,145** | **0.560** | **1.0** | **4** | **218** | **3.6** |
 
-### Bunny (Genus-0)
+### 2. Bunny (Genus-0)
 
-| Method | Vertices | Elements | Worst SJ | Best SJ | Refinement Level | Time (s) |
-|---|---|---|---|---|---|---|
-| [Hu 2013](https://scholar.google.com/scholar?q=Adaptive+all-hexahedral+mesh+generation+based+on+a+hybrid+octree+and+bubble+packing) | 46,476 | 39,605 | 0.00100 | 1.0 | 3 | 462 |
-| [Gao 2019](https://cims.nyu.edu/gcl/papers/2019-OctreeMeshing.pdf) | 35,330 | 29,698 | 0.292 | 0.999 | 4 | 3,569 |
-| [Zhang 2013](https://doi.org/10.1016/j.cma.2012.12.020) | 119,799 | 106,730 | 3.85×10⁻⁵ | 1.0 | 3 | 258 |
-| **[Tong 2024](https://arxiv.org/pdf/2401.05984)** | **26,375** | **21,695** | **0.570** | **1.0** | **4** | **358** |
+| Method | Vertices | Elements | Worst SJ | Best SJ | Refinement Level | Time (s) | Time (min) |
+|---|---|---|---|---|---|---|---|
+| [Hu 2013](https://scholar.google.com/scholar?q=Adaptive+all-hexahedral+mesh+generation+based+on+a+hybrid+octree+and+bubble+packing) | 46,476 | 39,605 | 0.00100 | 1.0 | 3 | 462 | 7.7 |
+| [Gao 2019](https://cims.nyu.edu/gcl/papers/2019-OctreeMeshing.pdf) | 35,330 | 29,698 | 0.292 | 0.999 | 4 | 3,569 | 59.5 |
+| [Zhang 2013](https://doi.org/10.1016/j.cma.2012.12.020) | 119,799 | 106,730 | 3.85×10⁻⁵ | 1.0 | 3 | 258 | 4.3 |
+| **[Tong 2024](https://arxiv.org/pdf/2401.05984)** | **26,375** | **21,695** | **0.570** | **1.0** | **4** | **358** | **6.0** |
 
-### David (Genus-0)
+### 3. David (Genus-0)
 
-| Method | Vertices | Elements | Worst SJ | Best SJ | Refinement Level | Time (s) |
-|---|---|---|---|---|---|---|
-| [Gao 2019](https://cims.nyu.edu/gcl/papers/2019-OctreeMeshing.pdf) | 127,778 | 112,314 | 0.126 | 0.999 | 4 | 38,866 |
-| **[Tong 2024](https://arxiv.org/pdf/2401.05984)** | **319,465** | **282,957** | **0.560** | **1.0** | **6** | **10,450** |
+| Method | Vertices | Elements | Worst SJ | Best SJ | Refinement Level | Time (s) | Time (min) |
+|---|---|---|---|---|---|---|---|
+| [Gao 2019](https://cims.nyu.edu/gcl/papers/2019-OctreeMeshing.pdf) | 127,778 | 112,314 | 0.126 | 0.999 | 4 | 38,866 | 647.8 |
+| **[Tong 2024](https://arxiv.org/pdf/2401.05984)** | **319,465** | **282,957** | **0.560** | **1.0** | **6** | **10,450** | **174.2** |
 
-### Deformed Armadillo (Genus-0)
+### 4. Deformed Armadillo (Genus-0)
 
-| Method | Vertices | Elements | Worst SJ | Best SJ | Refinement Level | Time (s) |
-|---|---|---|---|---|---|---|
-| [Gao 2019](https://cims.nyu.edu/gcl/papers/2019-OctreeMeshing.pdf) | 43,591 | 35,611 | 0.0678 | 0.999 | 4 | 6,573 |
-| **[Tong 2024](https://arxiv.org/pdf/2401.05984)** | **43,216** | **34,939** | **0.560** | **1.0** | **5** | **3,431** |
+| Method | Vertices | Elements | Worst SJ | Best SJ | Refinement Level | Time (s) | Time (min) |
+|---|---|---|---|---|---|---|---|
+| [Gao 2019](https://cims.nyu.edu/gcl/papers/2019-OctreeMeshing.pdf) | 43,591 | 35,611 | 0.0678 | 0.999 | 4 | 6,573 | 109.6 |
+| **[Tong 2024](https://arxiv.org/pdf/2401.05984)** | **43,216** | **34,939** | **0.560** | **1.0** | **5** | **3,431** | **57.2** |
 
-### Dragon Stand2 (Genus-1)
+### 5. Dragon Stand2 (Genus-1)
 
-| Method | Vertices | Elements | Worst SJ | Best SJ | Refinement Level | Time (s) |
-|---|---|---|---|---|---|---|
-| [Gao 2019](https://cims.nyu.edu/gcl/papers/2019-OctreeMeshing.pdf) | 74,618 | 61,441 | 0.0290 | 0.999 | 5 | 23,062 |
-| **[Tong 2024](https://arxiv.org/pdf/2401.05984)** | **62,576** | **50,853** | **0.560** | **1.0** | **4** | **2,052** |
+| Method | Vertices | Elements | Worst SJ | Best SJ | Refinement Level | Time (s) | Time (min) |
+|---|---|---|---|---|---|---|---|
+| [Gao 2019](https://cims.nyu.edu/gcl/papers/2019-OctreeMeshing.pdf) | 74,618 | 61,441 | 0.0290 | 0.999 | 5 | 23,062 | 384.4 |
+| **[Tong 2024](https://arxiv.org/pdf/2401.05984)** | **62,576** | **50,853** | **0.560** | **1.0** | **4** | **2,052** | **34.2** |
 
-### Gargoyle (Genus-0)
+### 6. Gargoyle (Genus-0)
 
-| Method | Vertices | Elements | Worst SJ | Best SJ | Refinement Level | Time (s) |
-|---|---|---|---|---|---|---|
-| [Gao 2019](https://cims.nyu.edu/gcl/papers/2019-OctreeMeshing.pdf) | 157,008 | 135,737 | 0.0702 | 0.999 | 4 | – |
-| **[Tong 2024](https://arxiv.org/pdf/2401.05984)** | **273,704** | **236,689** | **0.550** | **1.0** | **4** | **8,769** |
+| Method | Vertices | Elements | Worst SJ | Best SJ | Refinement Level | Time (s) | Time (min) |
+|---|---|---|---|---|---|---|---|
+| [Gao 2019](https://cims.nyu.edu/gcl/papers/2019-OctreeMeshing.pdf) | 157,008 | 135,737 | 0.0702 | 0.999 | 4 | – | – |
+| **[Tong 2024](https://arxiv.org/pdf/2401.05984)** | **273,704** | **236,689** | **0.550** | **1.0** | **4** | **8,769** | **146.2** |
 
 *(Gargoyle's Gao 2019 time is "–" in the original — the paper doesn't
 report a value for that cell.)*
 
-### Head (Genus-0)
+### 7. Head (Genus-0)
 
-| Method | Vertices | Elements | Worst SJ | Best SJ | Refinement Level | Time (s) |
-|---|---|---|---|---|---|---|
-| [Zhang 2013](https://doi.org/10.1016/j.cma.2012.12.020) | 64,258 | 56,419 | 0.0130 | 1.0 | 3 | 169 |
-| **[Tong 2024](https://arxiv.org/pdf/2401.05984)** | **62,782** | **55,038** | **0.550** | **1.0** | **5** | **444** |
+| Method | Vertices | Elements | Worst SJ | Best SJ | Refinement Level | Time (s) | Time (min) |
+|---|---|---|---|---|---|---|---|
+| [Zhang 2013](https://doi.org/10.1016/j.cma.2012.12.020) | 64,258 | 56,419 | 0.0130 | 1.0 | 3 | 169 | 2.8 |
+| **[Tong 2024](https://arxiv.org/pdf/2401.05984)** | **62,782** | **55,038** | **0.550** | **1.0** | **5** | **444** | **7.4** |
 
-### Lion Recon (Genus-0)
+### 8. Lion Recon (Genus-0)
 
-| Method | Vertices | Elements | Worst SJ | Best SJ | Refinement Level | Time (s) |
-|---|---|---|---|---|---|---|
-| [Gao 2019](https://cims.nyu.edu/gcl/papers/2019-OctreeMeshing.pdf) | 134,140 | 115,245 | 0.178 | 0.999 | 4 | 18,755 |
-| **[Tong 2024](https://arxiv.org/pdf/2401.05984)** | **112,847** | **95,251** | **0.570** | **1.0** | **4** | **2,046** |
+| Method | Vertices | Elements | Worst SJ | Best SJ | Refinement Level | Time (s) | Time (min) |
+|---|---|---|---|---|---|---|---|
+| [Gao 2019](https://cims.nyu.edu/gcl/papers/2019-OctreeMeshing.pdf) | 134,140 | 115,245 | 0.178 | 0.999 | 4 | 18,755 | 312.6 |
+| **[Tong 2024](https://arxiv.org/pdf/2401.05984)** | **112,847** | **95,251** | **0.570** | **1.0** | **4** | **2,046** | **34.1** |
 
-### Oil Pump (Genus-4)
+### 9. Oil Pump (Genus-4)
 
-| Method | Vertices | Elements | Worst SJ | Best SJ | Refinement Level | Time (s) |
-|---|---|---|---|---|---|---|
-| [Gao 2019](https://cims.nyu.edu/gcl/papers/2019-OctreeMeshing.pdf) | 75,033 | 63,012 | 0.117 | 0.999 | 4 | 14,301 |
-| **[Tong 2024](https://arxiv.org/pdf/2401.05984)** | **233,702** | **196,455** | **0.540** | **1.0** | **5** | **9,742** |
+| Method | Vertices | Elements | Worst SJ | Best SJ | Refinement Level | Time (s) | Time (min) |
+|---|---|---|---|---|---|---|---|
+| [Gao 2019](https://cims.nyu.edu/gcl/papers/2019-OctreeMeshing.pdf) | 75,033 | 63,012 | 0.117 | 0.999 | 4 | 14,301 | 238.4 |
+| **[Tong 2024](https://arxiv.org/pdf/2401.05984)** | **233,702** | **196,455** | **0.540** | **1.0** | **5** | **9,742** | **162.4** |
 
-### Ramses (Genus-0)
+### 10. Ramses (Genus-0)
 
-| Method | Vertices | Elements | Worst SJ | Best SJ | Refinement Level | Time (s) |
-|---|---|---|---|---|---|---|
-| [Gao 2019](https://cims.nyu.edu/gcl/papers/2019-OctreeMeshing.pdf) | 54,634 | 46,923 | 0.0161 | 0.999 | 4 | 9,395 |
-| **[Tong 2024](https://arxiv.org/pdf/2401.05984)** | **44,790** | **37,993** | **0.590** | **1.0** | **4** | **713** |
+| Method | Vertices | Elements | Worst SJ | Best SJ | Refinement Level | Time (s) | Time (min) |
+|---|---|---|---|---|---|---|---|
+| [Gao 2019](https://cims.nyu.edu/gcl/papers/2019-OctreeMeshing.pdf) | 54,634 | 46,923 | 0.0161 | 0.999 | 4 | 9,395 | 156.6 |
+| **[Tong 2024](https://arxiv.org/pdf/2401.05984)** | **44,790** | **37,993** | **0.590** | **1.0** | **4** | **713** | **11.9** |
 
-### Red Circular Box (Genus-0)
+### 11. Red Circular Box (Genus-0)
 
-| Method | Vertices | Elements | Worst SJ | Best SJ | Refinement Level | Time (s) |
-|---|---|---|---|---|---|---|
-| [Gao 2019](https://cims.nyu.edu/gcl/papers/2019-OctreeMeshing.pdf) | 409,011 | 367,583 | 0.215 | 0.999 | 4 | 71,626 |
-| **[Tong 2024](https://arxiv.org/pdf/2401.05984)** | **351,881** | **313,866** | **0.560** | **1.0** | **4** | **7,547** |
+| Method | Vertices | Elements | Worst SJ | Best SJ | Refinement Level | Time (s) | Time (min) |
+|---|---|---|---|---|---|---|---|
+| [Gao 2019](https://cims.nyu.edu/gcl/papers/2019-OctreeMeshing.pdf) | 409,011 | 367,583 | 0.215 | 0.999 | 4 | 71,626 | 1193.8 |
+| **[Tong 2024](https://arxiv.org/pdf/2401.05984)** | **351,881** | **313,866** | **0.560** | **1.0** | **4** | **7,547** | **125.8** |
 
-### Thai Statue (Genus-3)
+### 12. Thai Statue (Genus-3)
 
-| Method | Vertices | Elements | Worst SJ | Best SJ | Refinement Level | Time (s) |
-|---|---|---|---|---|---|---|
-| [Gao 2019](https://cims.nyu.edu/gcl/papers/2019-OctreeMeshing.pdf) | 70,561 | 59,470 | 0.180 | 0.999 | 4 | 26,075 |
-| **[Tong 2024](https://arxiv.org/pdf/2401.05984)** | **64,764** | **53,831** | **0.550** | **1.0** | **4** | **1,845** |
+| Method | Vertices | Elements | Worst SJ | Best SJ | Refinement Level | Time (s) | Time (min) |
+|---|---|---|---|---|---|---|---|
+| [Gao 2019](https://cims.nyu.edu/gcl/papers/2019-OctreeMeshing.pdf) | 70,561 | 59,470 | 0.180 | 0.999 | 4 | 26,075 | 434.6 |
+| **[Tong 2024](https://arxiv.org/pdf/2401.05984)** | **64,764** | **53,831** | **0.550** | **1.0** | **4** | **1,845** | **30.8** |
 
 ## Bottle1 (Genus-1)
 
