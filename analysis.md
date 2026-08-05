@@ -69,24 +69,45 @@ the paper's own algorithmic narrative (curvature/narrow-region assessment
 → octree generation → dualization → buffer clearing → buffer-zone
 projection/quality improvement).
 
+Percentages are each stage's share of that *column's own* total, so each
+column's percentages sum to 100% once the column is complete. Columns
+still mid-run show percentages as "pending" — a partial-time percentage
+would be a moving target as remaining stages add to the denominator, so
+these are only filled in once each column's run finishes and its final
+total is known. Sub-rows (curvature/narrow-region and octree-balancing,
+where measured separately) show their share of the *combined* row instead
+of the grand total — including them in the grand-total column as well
+would double-count that time — so the 100% breakdown for each column
+comes from exactly five rows: read, combined octree, dualization, buffer
+clearing, and projection+quality improvement.
+
 | Stage | bone (M4, 2026-07-02) | bone (M1, 2026-08-04) | Bottle1 (M1, 2026-08-04) |
 |---|---|---|---|
-| Read surface mesh | ~0.4 s | 0.57 s | 1.8 s |
-| Curvature and Narrow Region Assessment | n/a¹ | 31.6 s | n/a¹ |
-| Octree Generation (strongly balanced) | n/a¹ | 19.6 s | n/a¹ |
-| — combined (curvature + octree), as `Main.cpp` reports it¹ | ~38–39 s | 55.3 s | **1062.2 s (~17.7 min)** |
-| Mesh Dualization | ~12–13 s | 17.1 s | **1138.9 s (~19.0 min)** |
-| Buffer Clearing | ~13 s | *pending* | **815.1 s (~13.6 min)** |
-| Buffer Zone Projection + Quality Improvement | ~200 s | *pending* | *converging — badElem: 0 checkpoints appearing* |
-| **Total** | **~4.5 min** | *pending* | *pending* |
+| Read surface mesh | ~0.4 s (0.2%) | 0.57 s (pending) | 1.8 s (pending) |
+| Curvature and Narrow Region Assessment | n/a¹ | 31.6 s (57.1% of combined) | n/a¹ |
+| Octree Generation (strongly balanced) | n/a¹ | 19.6 s (35.4% of combined) | n/a¹ |
+| — combined (curvature + octree), as `Main.cpp` reports it¹ | ~38–39 s (14.6%) | 55.3 s (pending) | **1062.2 s (~17.7 min) (pending)** |
+| Mesh Dualization | ~12–13 s (4.7%) | 17.1 s (pending) | **1138.9 s (~19.0 min) (pending)** |
+| Buffer Clearing | ~13 s (4.9%) | 21.7 s (pending) | **815.1 s (~13.6 min) (pending)** |
+| Buffer Zone Projection + Quality Improvement | ~200 s (75.6%) | *in progress — converging, see log* | *in progress — converging, see log* |
+| **Total** | **~4.5 min (264.4 s summed² ⇒ 100%)** | *pending* | *pending* |
 
 ¹ The M4 bone run and the Bottle1 run both used a pre-split binary, so
 curvature/narrow-region assessment and octree balancing are only
 available as one combined number for those two ("— combined" row). The
 M1 bone run (added specifically to get a same-machine comparison point,
-and launched after the timing-instrumentation split) will report both
-substages separately — its combined-row cell is left as "—" once its two
-split values are known, to avoid double-counting.
+and launched after the timing-instrumentation split) reports both
+substages separately; they sum to 92.5% of the combined cell, not 100%,
+because `Main.cpp`'s own combined timer also includes a small amount of
+cleanup-call/`clock()`-rounding overhead between and around the two
+sub-measurements.
+
+² `bone` (M4)'s five stage values were originally reported as ranges
+(e.g. "~38–39 s"); percentages use each range's midpoint, summing to
+264.4 s — close to, but not identical to, the "~4.5 minutes" total
+originally reported for that run (itself a rounded figure). The summed
+264.4 s, not the rounded ~4.5 min, is the percentage denominator, so the
+column's percentages are internally consistent and sum to exactly 100%.
 
 Every stage so far is dramatically slower than bone's, and by increasingly
 inconsistent factors relative to the ~3.5x element-count ratio: octree
