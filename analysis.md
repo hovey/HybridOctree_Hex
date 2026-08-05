@@ -194,19 +194,23 @@ not an algorithm problem — resolved.
 **But mesh size barely moved** — 218,898 → 212,990 vertices, only a
 ~2.7% reduction — despite the same `C_THRES` fix taking `bone` from
 19,639 → 14,856 vertices (a ~24% reduction, into a good match against
-its published stats; see the Bone section below). This is a new,
-unexplained finding: `C_THRES` (curvature) clearly isn't the dominant
-octree-refinement driver for Bottle1 the way it is for `bone`. The
-leading hypothesis, not yet confirmed: `H_THRES` (thickness/narrow-region
-thresholds, `{16,8,4,2,1}`, unchanged from the shipped values and already
-matching the paper exactly) may be the dominant driver for Bottle1
-specifically, given its thin coiled/spiral surface detail (the paper's
-own Fig. 6(a) zoom-in) — the same narrow-region mechanism the paper's own
-text calls out for the oil pump model needing extra refinement. This
-hasn't been tested (would mean tuning `H_THRES` against a paper formula
-that, per the curvature-formula finding above, doesn't necessarily even
-correspond to what this codebase computes for thickness either — not yet
-checked).
+its published stats; see the Bone section below). This is a new
+finding: `C_THRES` (curvature) clearly isn't the dominant octree-
+refinement driver for Bottle1 the way it is for `bone`.
+
+**`H_THRES` hypothesis tested and refuted (2026-08-05).** The leading
+hypothesis was that `H_THRES` (thickness/narrow-region, `{16,8,4,2,1}`,
+unchanged and already matching the paper) dominates for Bottle1
+specifically, given its thin coiled/spiral surface detail. Tested cheaply
+(octree-construction-only, ~17 min, not the full pipeline) by halving
+`H_THRES` to `{8,4,2,1,0.5}` — a much stricter thickness gate. Result:
+octree size barely changed (358,307→354,875 points, ~1%), refuting the
+hypothesis. `H_THRES` reverted to the paper-matching value. Neither
+threshold, tuned individually, explains Bottle1's over-refinement — see
+the summary log for the still-open question this leaves, and a genuine
+code-level anomaly found in the thickness computation along the way
+(worth investigating further, though it turned out not to be the answer
+here).
 
 **Timing**: `/usr/bin/time -l`'s wall-clock ("real") total was 12590.2s
 (~209.8 min), but the sum of `HexGen`'s own internal stage timers only
@@ -571,13 +575,16 @@ quantity — no valid unit conversion between the two). Empirical
 recalibration against `bone`'s known-good published stats got `bone`'s
 size within ~1.5x — but the *same* recalibrated `C_THRES` only took
 Bottle1 from 218,898 → 212,990 vertices, a ~2.7% reduction, nowhere near
-`bone`'s ~24% improvement with the identical fix. That's a new, still-open
-finding: `C_THRES` (curvature) isn't the dominant octree-refinement
-driver for Bottle1 the way it is for `bone`. Leading hypothesis, not yet
-tested: `H_THRES` (thickness/narrow-region, unchanged, already matching
-the paper's stated values) may dominate for Bottle1 given its thin
-coiled/spiral surface detail — the same narrow-region mechanism the paper
-calls out for the oil pump model needing extra refinement.
+`bone`'s ~24% improvement with the identical fix. That's a finding:
+`C_THRES` (curvature) isn't the dominant octree-refinement driver for
+Bottle1 the way it is for `bone`. The follow-up hypothesis — `H_THRES`
+(thickness/narrow-region) dominates instead, given Bottle1's thin
+coiled/spiral surface detail — was tested and refuted: halving `H_THRES`
+only shrank the octree by ~1%. Neither threshold, tuned individually,
+explains Bottle1's over-refinement — still an open question (see the
+2026-08-05 log entry's `H_THRES` test for the details, including a
+genuine code-level anomaly found in the thickness-distance computation
+along the way that didn't turn out to be the answer here either).
 
 *Runtime — the real story, and not explained by either fix above.*
 Comparing `bone` (calibrated) against Bottle1 (calibrated), same code,
@@ -627,8 +634,54 @@ version of `HexGen.cpp` that's public doesn't have the optimizations
 that the version used to generate Table 2 had. This isn't a mistake in
 this reproduction's methodology — it's a real, structural gap between
 the published performance numbers and the current state of the public
-code, on top of the mesh-size question (now narrowed to a `C_THRES`-vs-
-`H_THRES` question rather than fully resolved).
+code, on top of the mesh-size question (still open — see the `H_THRES`
+test immediately below, which ruled out the other obvious candidate).
+
+**`H_THRES` hypothesis test (2026-08-05).** Before testing, re-read
+`GetCellValue()`'s thickness computation (`HexGen.cpp:936-985`) against
+the paper's stated method ("shooting a ray from `Pi` along its normal
+direction to find the shortest intersection with other triangular
+elements") — structurally it matches (ray from a triangle's centroid
+along its normal, tested against every other triangle via `Intersect()`),
+*unlike* the curvature computation's outright formula mismatch. But
+found a genuine anomaly along the way: the code scales the raw
+ray-intersection distance by `max(|dir_x|,|dir_y|,|dir_z|)` — the
+dominant-axis component of the (unit, normalized) triangle-normal
+direction — before comparing it to `H_THRES` (`HexGen.cpp:952-954`). That
+factor is always in `[1/√3, 1]`, so it always *shrinks* the effective
+distance relative to true Euclidean distance, by up to ~42% for normals
+oriented diagonally to the octree axes. Plausible rationale (converting
+to an octree-cell-crossing-relevant metric rather than raw 3D distance)
+rather than an obvious bug like the `C_THRES` zeros, but not something
+the paper's plain-language description mentions either. A coiled/spiral
+surface like Bottle1's has far more diagonally-oriented normals than
+bone's simpler shape, so this seemed like a promising lead.
+
+Tested empirically rather than reasoning it through further: halved
+`H_THRES` to `{8,4,2,1,0.5}` — a much stricter thickness gate that should
+sharply cut the number of triangle pairs flagged as "thin enough to
+refine" if thickness detection were the dominant driver. Ran cheaply
+(octree-construction-only, ~17 min via `build-h-thres-test/`, killed
+immediately after `ConstructOctree()` completed — no need for the full
+~142 min pipeline just to read `octree.vtk`'s point/cell counts) rather
+than committing to another multi-hour full run. Result: `octree.vtk` went
+from 358,307/300,560 (points/cells) to 354,875/297,368 — a ~1% change.
+**Hypothesis refuted.** `H_THRES` reverted to the paper-matching
+`{16,8,4,2,1}` in `Initialization.h`.
+
+Neither `C_THRES` nor `H_THRES`, tuned individually, explains Bottle1's
+disproportionate over-refinement relative to `bone`. Remaining
+candidates, none yet tested: (a) the octree balancing rule
+(`StrongBalancedOctree()`'s 2:1 constraint) propagating refinement far
+beyond the initially-flagged cells, so that once *some* threshold flags
+enough scattered cells across Bottle1's more extensive/complex surface,
+balancing alone forces widespread deep refinement regardless of exactly
+which threshold triggered the initial flags; (b) some other input
+property (e.g. `VOXEL_SIZE`/model-to-box-scale interaction, or an
+octree-orientation-vs-geometry effect like the paper's own oil-pump
+discussion) not captured by either threshold at all. This remains open;
+`bottle1-h-thres-test/` and `build-h-thres-test/` were both deleted after
+capturing the result (throwaway experiment, not meaningful to preserve).
 
 ### 2026-08-04 — Bottle1 reproduction attempt + timing instrumentation (Apple M1)
 
