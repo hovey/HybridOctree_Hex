@@ -905,14 +905,6 @@ inline void hexGen::ReadRawData(const char* inputFileName, const char* outputFil
 inline void hexGen::GetCellValue() {
 	int i, j, k;
 	double center[3], tmp[3], dir[3], len;
-	// TEMPORARY diagnostic instrumentation (2026-08-05), to be removed once
-	// the ~11x Bottle1-vs-bone slowdown (beyond the ~6x explained by O(n^2)
-	// triangle-count scaling) is understood. Testing the hypothesis that
-	// Bottle1's thin coiled/spiral surface detail causes a much higher
-	// thickness-test "hit rate" than bone, producing disproportionately
-	// more push_back()/unordered_set-dedup work, not just costlier
-	// Intersect() calls. See analysis.md's summary log.
-	clock_t diagLoopStart = clock();
 	for (i = 0; i < triMesh.eNum; i++) {
 		for (j = 0; j < 3; j++)
 			// curvature
@@ -993,14 +985,6 @@ inline void hexGen::GetCellValue() {
 				}
 		}
 	}
-	// TEMPORARY diagnostic (see note above): raw hit counts and the O(n^2)
-	// loop's own elapsed time, before dedup.
-	std::cout << "[diag] GetCellValue raw loop: " << (double)(clock() - diagLoopStart) / CLOCKS_PER_SEC << "s"
-		<< " | refineTri sizes (raw, pre-dedup): " << refineTri0.size() << " " << refineTri1.size() << " "
-		<< refineTri2.size() << " " << refineTri3.size() << " " << refineTri4.size()
-		<< " | refineTriPt sizes (raw, pre-dedup): " << refineTriPt0.size() << " " << refineTriPt1.size() << " "
-		<< refineTriPt2.size() << " " << refineTriPt3.size() << " " << refineTriPt4.size() << std::endl;
-	clock_t diagDedupStart = clock();
 	std::unordered_set<int> s0(refineTriPt0.begin(), refineTriPt0.end());
 	refineTriPt0.assign(s0.begin(), s0.end());
 	std::unordered_set<int> s1(refineTriPt1.begin(), refineTriPt1.end());
@@ -1025,22 +1009,20 @@ inline void hexGen::GetCellValue() {
 	refineTri4.assign(s04.begin(), s04.end());
 	//std::unordered_set<int> s05(refineTri5.begin(), refineTri5.end());
 	//refineTri5.assign(s05.begin(), s05.end());
-	// TEMPORARY diagnostic (see note above): dedup step's own elapsed time
-	// and post-dedup (deduplicated) sizes.
-	std::cout << "[diag] GetCellValue dedup: " << (double)(clock() - diagDedupStart) / CLOCKS_PER_SEC << "s"
-		<< " | refineTri sizes (deduped): " << refineTri0.size() << " " << refineTri1.size() << " "
-		<< refineTri2.size() << " " << refineTri3.size() << " " << refineTri4.size()
-		<< " | refineTriPt sizes (deduped): " << refineTriPt0.size() << " " << refineTriPt1.size() << " "
-		<< refineTriPt2.size() << " " << refineTriPt3.size() << " " << refineTriPt4.size() << std::endl;
-	// TEMPORARY diagnostic (see note above): time the recursive
-	// ComputeCellValue() sweep separately — this is the suspected real
-	// bottleneck (per-octree-cell linear scans through the candidate
-	// lists above, no spatial acceleration structure), not the O(n^2)
-	// loop or dedup step timed above.
-	clock_t diagCCVStart = clock();
+	// Note (2026-08-05): ComputeCellValue() below recurses over every
+	// octree node and, at each of the five tested refinement levels, does
+	// a brute-force linear scan through that level's candidate list
+	// (refineTri0..4/refineTriPt0..4 above) for every cell being
+	// classified — no spatial acceleration structure. Confirmed via
+	// temporary instrumentation (since removed) as the dominant cost on
+	// geometrically complex models: ~76x slower on Bottle1 vs. bone,
+	// heavily overshooting the ~6x that input-triangle-count scaling
+	// alone would predict, because both the number of cells needing
+	// classification and the candidate-list sizes scale up with surface
+	// complexity and compound multiplicatively. See analysis.md's
+	// 2026-08-05 summary log for the full investigation.
 	for (i = levelId[octreeDepth] - 1; i > -1; i--)
 		ComputeCellValue(i, getLevel[i]);
-	std::cout << "[diag] GetCellValue ComputeCellValue sweep: " << (double)(clock() - diagCCVStart) / CLOCKS_PER_SEC << "s" << std::endl;
 }
 
 inline void hexGen::ComputeCellValue(int octreeId, int level) {
