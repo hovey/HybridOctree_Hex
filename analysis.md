@@ -334,33 +334,66 @@ the same thresholds (65.8x longer, vs. only ~2.45x more input triangles:
 finished, ~34 min in) to investigate rather than let it continue on an
 unbounded timeline.
 
-**Root cause of the second bottleneck**: `GetCellValue()`'s
-thickness/narrow-region check (`HexGen.cpp:950-986`) is a brute-force
-all-pairs loop — for every triangle `i`, it ray-tests against every other
-triangle `j > i` (via `Intersect()`) with no spatial acceleration
-structure (no BVH/octree/kd-tree) and no early exit. This is exactly the
-paper's described operation ("shooting a ray... to find the shortest
+**First hypothesis (wrong, corrected below)**: initially suspected
+`GetCellValue()`'s thickness/narrow-region check (`HexGen.cpp:950-986`) —
+a brute-force all-pairs loop, for every triangle `i` ray-testing against
+every other triangle `j > i` via `Intersect()`, with no spatial
+acceleration structure (no BVH/octree/kd-tree) and no early exit — exactly
+the paper's described operation ("shooting a ray... to find the shortest
 intersection with other triangular elements"), implemented as literal
-O(n²) over the input triangle count:
-- bone: 12,088 triangles → ~73M pairs → 11.0s.
-- Bottle1: 29,664 triangles (2.45x more) → ~440M pairs (**6.0x more**,
-  since O(n²)) → but observed **724.4s = 65.8x slower**, not 6.0x.
+O(n²) over the input triangle count. Reasoned that O(n²) scaling
+(bone: 12,088 triangles → ~73M pairs; Bottle1: 29,664, 2.45x more →
+~440M pairs, **6.0x more**) explained part of the 65.8x slowdown, with an
+unexplained ~11x remainder attributed to `Intersect()` costing more per
+call on Bottle1's geometry.
 
-O(n²) triangle-count scaling explains about 6x of the slowdown — the
-structural reason Bottle1 is inherently much worse than bone here, since
-it has more input triangles and this check is quadratic in that count —
-but there's a further **~11x unexplained** beyond that, not yet
-diagnosed; a leading candidate is `Intersect()` itself costing more per
-call on Bottle1's specific geometry (its thin coiled/spiral surface
-detail may trigger more expensive branches or near-degenerate cases in
-the ray-triangle test), but this hasn't been confirmed. This is a genuine
-performance bottleneck in the shipped algorithm's implementation, entirely
-unrelated to `C_THRES` calibration — it would affect any sufficiently
-detailed/dense input model, not just Bottle1, since it happens before the
-octree stage that consumes its output. Investigation of the ~11x factor
-is in progress; both Bottle1 reruns from this session
-(`runs/bottle1-v2/`, killed mid-run) are being kept alongside the
-2026-08-04 `runs/bottle1/` as before/after evidence.
+**Actual root cause, confirmed by direct instrumentation**: this was
+wrong — the O(n²) triangle-pair loop is fast (bone 1.57s, Bottle1 9.7s;
+its trailing `unordered_set`-based dedup step is negligible, <0.003s for
+both). Added temporary `clock()` instrumentation splitting
+`GetCellValue()`'s three phases (raw O(n²) loop, dedup, and the trailing
+`ComputeCellValue()` recursive sweep it calls at line ~1035) confirmed the
+real cost is almost entirely the third phase:
+
+| Phase | bone | Bottle1 | Ratio |
+|---|---|---|---|
+| O(n²) raw loop (thickness/curvature candidate collection) | 1.57 s | 9.70 s | 6.2x |
+| `unordered_set` dedup | 0.0007 s | 0.0023 s | 3.3x |
+| `ComputeCellValue()` recursive sweep | ~9.45 s (inferred) | **720.6 s** | **~76x** |
+
+`ComputeCellValue()` (`HexGen.cpp:1039` onward) recurses over every octree
+node; at each of the five tested refinement levels (4-8, corresponding to
+`refineTri0..4`/`refineTriPt0..4`) it does a **linear scan through that
+level's entire candidate list** for every cell being classified at that
+level (e.g. `HexGen.cpp:1217-1241` for the coarsest level, scanning
+`refineTriPt0`/`refineTri0` — up to 41,442/64,506 raw candidates for
+Bottle1 — with up to 12 `Intersect()` box-face calls per triangle
+candidate), stopping only on the first hit. There's no spatial index (no
+BVH, no reuse of the octree structure itself, no spatial hash) for this
+lookup — it's the same brute-force pattern as the (much cheaper) O(n²)
+loop, but applied per-*octree-cell* rather than per-*triangle*, and the
+candidate lists it scans are themselves 2.9-3.2x larger for Bottle1
+(deduped `refineTri0`: 15,444 vs. bone's 5,386; `refineTriPt0`: 6,036 vs.
+3,134). Both factors — more octree cells needing classification at deep
+levels (Bottle1's coiled/spiral surface drives refinement into more of the
+volume) and larger per-level candidate lists to scan against each one —
+compound multiplicatively rather than adding, which is why the observed
+~76x so heavily overshoots the ~6x that raw triangle-count scaling alone
+would predict, and why the naive "O(n²) in triangle count" framing above
+was the wrong place to look.
+
+This is a genuine performance bottleneck in the shipped algorithm's
+implementation, entirely unrelated to `C_THRES` calibration — it would
+affect any sufficiently geometrically complex input model, not just
+Bottle1, since it's driven by how much of the octree needs deep
+refinement, not by input triangle count directly. The diagnostic
+`clock()`/`std::cout` instrumentation added to isolate this
+(`HexGen.cpp`, marked `TEMPORARY` in comments) is still in place pending a
+decision on next steps — not yet removed or built into a permanent fix.
+Both Bottle1 reruns from this session (`runs/bottle1-v2/`, killed
+mid-run; `runs/diag-bottle1/`, killed once diagnostic data was captured)
+are being kept alongside the 2026-08-04 `runs/bottle1/` as before/after
+evidence.
 
 ### 2026-08-04 — Bottle1 reproduction attempt + timing instrumentation (Apple M1)
 
