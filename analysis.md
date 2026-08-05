@@ -43,6 +43,69 @@ it starts from. Reproducing Table 2 is entirely a `HybridOctree_Hex`
 exercise — `HexOpt`'s optimizer has no role in the numbers tracked on this
 page, and this page lives here rather than in `HexOpt` accordingly.
 
+## Table 2, reproduced from the paper
+
+The paper's own Table 2 (p.10), transcribed in full below for reference.
+**`Tong 2024`** (bold) is the paper's "ours" row — the method this repo
+reproduces. The other rows are prior work the paper compares against,
+cited there as `[25]`, `[26]`, `[36]`; relabeled here as first-author
+surname + year, each linked to a live copy of the actual paper (open PDF
+where one exists; DOI landing page otherwise — noted per link since not
+all of these are open access).
+
+- **Tong 2024** — H. Tong, E. Halilaj, Y.J. Zhang, *HybridOctree_Hex*, J.
+  Comput. Sci. 78 (2024) 102278. [Open PDF (arXiv)](https://arxiv.org/pdf/2401.05984) · [DOI](https://doi.org/10.1016/j.jocs.2024.102278)
+  — this is the paper this whole page is about; same reference as the
+  intro above.
+- **Hu 2013** (`[25]`) — K. Hu, J. Qian, Y. Zhang, *Adaptive
+  all-hexahedral mesh generation based on a hybrid octree and bubble
+  packing*, 22nd International Meshing Roundtable, Orlando, FL, Oct.
+  2013. [Google Scholar search](https://scholar.google.com/scholar?q=Adaptive+all-hexahedral+mesh+generation+based+on+a+hybrid+octree+and+bubble+packing)
+  — no DOI or open PDF found for this one (an IMR "research notes" track
+  paper, not part of the Springer-published proceedings volume); linked
+  to a search as the best available pointer.
+- **Gao 2019** (`[26]`) — X. Gao, H. Shen, D. Panozzo, *Feature
+  Preserving Octree‐Based Hexahedral Meshing*, Computer Graphics Forum 38
+  (5) (2019) 135–149. [Open PDF (author-hosted, NYU)](https://cims.nyu.edu/gcl/papers/2019-OctreeMeshing.pdf) · [DOI](https://doi.org/10.1111/cgf.13795)
+  — the method most of Table 2's comparison rows are against.
+- **Zhang 2013** (`[36]`) — Y. Zhang, X. Liang, G. Xu, *A robust
+  2‑refinement algorithm in octree or dual‑contouring dodecahedral tree
+  based all‑hexahedral mesh generation*, Comput. Methods Appl. Mech.
+  Engrg. 256 (2013) 88–100. [DOI](https://doi.org/10.1016/j.cma.2012.12.020)
+  — DOI-only; no open PDF found.
+
+| Model | Method | Vertices | Elements | Worst SJ | Best SJ | Refinement Level | Time (s) |
+|---|---|---|---|---|---|---|---|
+| Bottle1 (Genus-1) | [Gao 2019](https://cims.nyu.edu/gcl/papers/2019-OctreeMeshing.pdf) | 39,326 | 33,635 | 0.181 | 0.999 | 4 | 8,175 |
+| Bottle1 (Genus-1) | **[Tong 2024](https://arxiv.org/pdf/2401.05984)** | **36,091** | **30,145** | **0.560** | **1.0** | **4** | **218** |
+| Bunny (Genus-0) | [Hu 2013](https://scholar.google.com/scholar?q=Adaptive+all-hexahedral+mesh+generation+based+on+a+hybrid+octree+and+bubble+packing) | 46,476 | 39,605 | 0.00100 | 1.0 | 3 | 462 |
+| Bunny (Genus-0) | [Gao 2019](https://cims.nyu.edu/gcl/papers/2019-OctreeMeshing.pdf) | 35,330 | 29,698 | 0.292 | 0.999 | 4 | 3,569 |
+| Bunny (Genus-0) | [Zhang 2013](https://doi.org/10.1016/j.cma.2012.12.020) | 119,799 | 106,730 | 3.85×10⁻⁵ | 1.0 | 3 | 258 |
+| Bunny (Genus-0) | **[Tong 2024](https://arxiv.org/pdf/2401.05984)** | **26,375** | **21,695** | **0.570** | **1.0** | **4** | **358** |
+| David (Genus-0) | [Gao 2019](https://cims.nyu.edu/gcl/papers/2019-OctreeMeshing.pdf) | 127,778 | 112,314 | 0.126 | 0.999 | 4 | 38,866 |
+| David (Genus-0) | **[Tong 2024](https://arxiv.org/pdf/2401.05984)** | **319,465** | **282,957** | **0.560** | **1.0** | **6** | **10,450** |
+| Deformed Armadillo (Genus-0) | [Gao 2019](https://cims.nyu.edu/gcl/papers/2019-OctreeMeshing.pdf) | 43,591 | 35,611 | 0.0678 | 0.999 | 4 | 6,573 |
+| Deformed Armadillo (Genus-0) | **[Tong 2024](https://arxiv.org/pdf/2401.05984)** | **43,216** | **34,939** | **0.560** | **1.0** | **5** | **3,431** |
+| Dragon Stand2 (Genus-1) | [Gao 2019](https://cims.nyu.edu/gcl/papers/2019-OctreeMeshing.pdf) | 74,618 | 61,441 | 0.0290 | 0.999 | 5 | 23,062 |
+| Dragon Stand2 (Genus-1) | **[Tong 2024](https://arxiv.org/pdf/2401.05984)** | **62,576** | **50,853** | **0.560** | **1.0** | **4** | **2,052** |
+| Gargoyle (Genus-0) | [Gao 2019](https://cims.nyu.edu/gcl/papers/2019-OctreeMeshing.pdf) | 157,008 | 135,737 | 0.0702 | 0.999 | 4 | – |
+| Gargoyle (Genus-0) | **[Tong 2024](https://arxiv.org/pdf/2401.05984)** | **273,704** | **236,689** | **0.550** | **1.0** | **4** | **8,769** |
+| Head (Genus-0) | [Zhang 2013](https://doi.org/10.1016/j.cma.2012.12.020) | 64,258 | 56,419 | 0.0130 | 1.0 | 3 | 169 |
+| Head (Genus-0) | **[Tong 2024](https://arxiv.org/pdf/2401.05984)** | **62,782** | **55,038** | **0.550** | **1.0** | **5** | **444** |
+| Lion Recon (Genus-0) | [Gao 2019](https://cims.nyu.edu/gcl/papers/2019-OctreeMeshing.pdf) | 134,140 | 115,245 | 0.178 | 0.999 | 4 | 18,755 |
+| Lion Recon (Genus-0) | **[Tong 2024](https://arxiv.org/pdf/2401.05984)** | **112,847** | **95,251** | **0.570** | **1.0** | **4** | **2,046** |
+| Oil Pump (Genus-4) | [Gao 2019](https://cims.nyu.edu/gcl/papers/2019-OctreeMeshing.pdf) | 75,033 | 63,012 | 0.117 | 0.999 | 4 | 14,301 |
+| Oil Pump (Genus-4) | **[Tong 2024](https://arxiv.org/pdf/2401.05984)** | **233,702** | **196,455** | **0.540** | **1.0** | **5** | **9,742** |
+| Ramses (Genus-0) | [Gao 2019](https://cims.nyu.edu/gcl/papers/2019-OctreeMeshing.pdf) | 54,634 | 46,923 | 0.0161 | 0.999 | 4 | 9,395 |
+| Ramses (Genus-0) | **[Tong 2024](https://arxiv.org/pdf/2401.05984)** | **44,790** | **37,993** | **0.590** | **1.0** | **4** | **713** |
+| Red Circular Box (Genus-0) | [Gao 2019](https://cims.nyu.edu/gcl/papers/2019-OctreeMeshing.pdf) | 409,011 | 367,583 | 0.215 | 0.999 | 4 | 71,626 |
+| Red Circular Box (Genus-0) | **[Tong 2024](https://arxiv.org/pdf/2401.05984)** | **351,881** | **313,866** | **0.560** | **1.0** | **4** | **7,547** |
+| Thai Statue (Genus-3) | [Gao 2019](https://cims.nyu.edu/gcl/papers/2019-OctreeMeshing.pdf) | 70,561 | 59,470 | 0.180 | 0.999 | 4 | 26,075 |
+| Thai Statue (Genus-3) | **[Tong 2024](https://arxiv.org/pdf/2401.05984)** | **64,764** | **53,831** | **0.550** | **1.0** | **4** | **1,845** |
+
+*(Gargoyle's `[26]`/Gao 2019 time is "–" in the original — the paper
+doesn't report a value for that cell.)*
+
 ## Bottle1 (Genus-1)
 
 | Metric | Tong et al. 2024 (Table 2, "ours") | This M1 run (2026-08-04) |
