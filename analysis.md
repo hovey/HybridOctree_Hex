@@ -74,8 +74,8 @@ projection/quality improvement).
 | Read surface mesh | ~0.4 s | 1.8 s |
 | Curvature and Narrow Region Assessment + Octree Generation (strongly balanced)¹ | ~38–39 s | **1062.2 s (~17.7 min)** |
 | Mesh Dualization | ~12–13 s | **1138.9 s (~19.0 min)** |
-| Buffer Clearing | ~13 s | *pending* |
-| Buffer Zone Projection + Quality Improvement | ~200 s | *pending* |
+| Buffer Clearing | ~13 s | **815.1 s (~13.6 min)** |
+| Buffer Zone Projection + Quality Improvement | ~200 s | *in progress* |
 | **Total** | **~4.5 min** | *pending* |
 
 ¹ Reported as one combined number for both of these runs — both predate
@@ -84,15 +84,15 @@ log), which separates curvature/narrow-region assessment from octree
 balancing into two independently-timed stages for future runs (Bunny,
 etc.), not retroactively for this one.
 
-Octree construction alone is already ~28x longer than bone's, despite
-Bottle1 targeting only ~3.5x more elements (30,145 vs. 8,619) — plausibly
-because Bottle1's thin, coiled surface detail (handle/spiral thread, see
-Fig. 6(a) in the paper) triggers much deeper curvature-driven octree
-refinement than bone's simpler shape, rather than octree construction time
-scaling with output element count. Dualization is even more extreme —
-**~87x** longer than bone's — despite operating on an octree whose leaf
-count, while not directly reported, is presumably driven by that same
-deeper refinement.
+Every stage so far is dramatically slower than bone's, and by increasingly
+inconsistent factors relative to the ~3.5x element-count ratio: octree
+construction ~28x, dualization ~87x, buffer clearing ~63x. This pattern
+(large, non-uniform multipliers rather than a roughly constant ~3.5x
+across stages) points toward Bottle1's thin, coiled surface detail
+(handle/spiral thread, see Fig. 6(a) in the paper) triggering much deeper
+curvature-driven octree refinement than bone's simpler shape — i.e. the
+real driver is octree depth/leaf count, not final output element count,
+and that deeper octree then compounds through every downstream stage.
 
 Bunny and the remaining Table 2 models will be added as their own sections
 below once Bottle1 is complete.
