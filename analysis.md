@@ -74,10 +74,10 @@ projection/quality improvement).
 | Read surface mesh | ~0.4 s | 0.57 s | 1.8 s |
 | Curvature and Narrow Region Assessment | n/a¹ | 31.6 s | n/a¹ |
 | Octree Generation (strongly balanced) | n/a¹ | 19.6 s | n/a¹ |
-| — combined (curvature + octree)¹ | ~38–39 s | 51.2 s | **1062.2 s (~17.7 min)** |
-| Mesh Dualization | ~12–13 s | *pending* | **1138.9 s (~19.0 min)** |
+| — combined (curvature + octree), as `Main.cpp` reports it¹ | ~38–39 s | 55.3 s | **1062.2 s (~17.7 min)** |
+| Mesh Dualization | ~12–13 s | 17.1 s | **1138.9 s (~19.0 min)** |
 | Buffer Clearing | ~13 s | *pending* | **815.1 s (~13.6 min)** |
-| Buffer Zone Projection + Quality Improvement | ~200 s | *pending* | *in progress* |
+| Buffer Zone Projection + Quality Improvement | ~200 s | *pending* | *converging — badElem: 0 checkpoints appearing* |
 | **Total** | **~4.5 min** | *pending* | *pending* |
 
 ¹ The M4 bone run and the Bottle1 run both used a pre-split binary, so
@@ -101,10 +101,10 @@ every downstream stage.
 
 The M1-vs-M4 bone comparison also rules out "this M1 is just a slower
 machine" as the main explanation: bone's combined curvature+octree stage
-is only ~30% slower on this M1 than on the M4 (51.2 s vs. ~38–39 s) — a
-small, plausible hardware gap, nowhere close to Bottle1's 21–28x factor
-over bone on the *same* M1. So the dominant effect really is Bottle1's
-own geometry, not the machine.
+is only ~40% slower on this M1 than on the M4 (55.3 s vs. ~38–39 s) — a
+small, plausible hardware gap, nowhere close to Bottle1's ~20x-plus
+factor over bone on the *same* M1. So the dominant effect really is
+Bottle1's own geometry, not the machine.
 
 Bunny and the remaining Table 2 models will be added as their own sections
 below once Bottle1 is complete.
