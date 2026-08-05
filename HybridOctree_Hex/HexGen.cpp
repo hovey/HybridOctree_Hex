@@ -3022,8 +3022,17 @@ void hexGen::ProjectToIsoSurface(const char* fileName) {// modify octreeMesh onl
 	// ~10-12% of checkpoints succeed (bone_tri.raw: 6/51 with
 	// PROJ_CONVERGE_TOL=1e-4), so ~150 checkpoints (150k raw iterations) is
 	// a realistic budget with margin, rather than the earlier 50k which cut
-	// convergence off well before ELEM_THRES could reach the cap.
-	const int MAX_PROJ_ITER = 200000;
+	// convergence off well before ELEM_THRES could reach the cap. That
+	// budget assumes bone's per-checkpoint cost (~1s); it does not hold for
+	// every model. Bottle1 (2026-08-04, this M1) measured ~56s/checkpoint —
+	// 200 checkpoints would extrapolate to several hours for that one model
+	// alone. Capped at 20000 (20 checkpoints, ~19 min ceiling at Bottle1's
+	// observed rate) as a deliberate, documented speed/convergence
+	// trade-off for that run (see analysis.md's summary log); this is not
+	// a per-model-tuned constant, just a smaller fixed backstop than
+	// bone's — a genuinely per-model budget would need this exposed as a
+	// parameter rather than hardcoded here.
+	const int MAX_PROJ_ITER = 20000;
 	// This is not a monotonically-converging optimization — the randomized
 	// redistribution step can (and empirically does) make badElem/smallDist
 	// worse on a later checkpoint than an earlier one (e.g. degrading around

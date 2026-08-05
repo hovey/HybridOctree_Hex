@@ -89,8 +89,8 @@ clearing, and projection+quality improvement.
 | — combined (curvature + octree), as `Main.cpp` reports it¹ | ~38–39 s (14.6%) | 55.3 s (13.4%) | **1062.2 s (~17.7 min) (pending)** |
 | Mesh Dualization | ~12–13 s (4.7%) | 17.1 s (4.1%) | **1138.9 s (~19.0 min) (pending)** |
 | Buffer Clearing | ~13 s (4.9%) | 21.7 s (5.2%) | **815.1 s (~13.6 min) (pending)** |
-| Buffer Zone Projection + Quality Improvement | ~200 s (75.6%) | **319.4 s (~5.3 min) (77.2%)** | *in progress — converging, see log* |
-| **Total** | **~4.5 min (264.4 s summed² ⇒ 100%)** | **419.5 s (~7.0 min, `time -l` real ⇒ 100%)** | *pending* |
+| Buffer Zone Projection + Quality Improvement | ~200 s (75.6%) | **319.4 s (~5.3 min) (77.2%)** | *in progress³ — converging, see log* |
+| **Total** | **~4.5 min (264.4 s summed² ⇒ 100%)** | **419.5 s (~7.0 min, `time -l` real ⇒ 100%)** | *pending³* |
 
 ¹ The M4 bone run and the Bottle1 run both used a pre-split binary, so
 curvature/narrow-region assessment and octree balancing are only
@@ -136,6 +136,25 @@ consistent with the redistribution step's `rand()` calls never being
 seeded (no `srand()` call anywhere in the codebase), so the "randomized"
 sequence is actually the same deterministic sequence on every run,
 regardless of machine.
+
+³ Bottle1's projection stage was initially let run at bone's
+`MAX_PROJ_ITER=200000` setting like the other columns, but killed after
+24 checkpoints (~22 min) once its per-checkpoint cost became clear:
+~56 s/checkpoint vs. bone's ~1 s/checkpoint, which extrapolated to
+several hours for the full 200-checkpoint budget. Rather than accept that
+runtime, `MAX_PROJ_ITER` was reduced to `20000` (20 checkpoints, ~19 min
+ceiling at Bottle1's observed rate) specifically for this run — a
+deliberate speed/convergence trade-off, documented in `HexGen.cpp`'s
+comments at the constant. The killed full-budget attempt reached
+`maxDist=0.00473` with `badElem=0` at its last checkpoint before being
+stopped (log preserved as `runs/bottle1/run.log.full-attempt-killed`,
+`finalMesh.vtk.full-attempt-killed`); the capped rerun resumed from the
+already-computed `octree.vtk`/`dualFullHex.vtk`/`dualHex.vtk` (via a
+temporary, uncommitted `Main.cpp` tweak, reverted immediately after
+launching) rather than redoing the ~50 minutes of earlier stages, so
+those four stages' timings above are unaffected by this change — only
+the projection stage and total differ from what the 200000-iteration
+attempt would have produced.
 
 Bunny and the remaining Table 2 models will be added as their own sections
 below once Bottle1 is complete.
@@ -189,6 +208,26 @@ Picking up the M4 session's fixed `HexGen.cpp` to reproduce Table 2's Bottle1 ro
   overhead. This only applies to runs made with the rebuilt binary or later — it can't retroactively
   split the Bottle1 octree time already captured above (1062.2 s), which stays reported as one combined
   number for this run.
+- **Same-machine bone comparison**: launched a full (non-throwaway) `bone_tri.raw` run on this M1
+  (`runs/bone-m1/`, using the split-timing binary) specifically to separate "M1 is a slower machine
+  than the M4" from "Bottle1 is geometrically harder," since both effects could otherwise look similar
+  in the raw numbers. Result: bone is a consistent ~37–67% slower on this M1 across every stage
+  (419.5s total vs. ~270s on the M4) — a real but modest hardware gap, nowhere near Bottle1's ~20–90x
+  factor over bone on the same M1. Also notable: bone (M1)'s projection stage converged to an almost
+  bit-identical best result as the M4 run (`smallDist` matches to 6 significant figures) — the
+  codebase never calls `srand()` (confirmed via `grep`), so the "randomized" redistribution step is
+  actually a fixed, machine-independent sequence.
+- **`MAX_PROJ_ITER` reduced for Bottle1 specifically**: let Bottle1's projection stage run at bone's
+  `MAX_PROJ_ITER=200000` setting initially, like the other columns, but killed it after 24 checkpoints
+  (~22 min, `maxDist` down to 0.00473 with `badElem=0`) once the per-checkpoint cost became clear
+  (~56s/checkpoint vs. bone's ~1s/checkpoint — a full 200-checkpoint run would have extrapolated to
+  several hours for this one model). Reduced `MAX_PROJ_ITER` to `20000` in `HexGen.cpp` specifically
+  (comment there documents the reasoning and that it's not a general per-model-tuned parameter, just a
+  smaller fixed backstop), rebuilt, and resumed from the already-computed
+  `octree.vtk`/`dualFullHex.vtk`/`dualHex.vtk` (via a temporary, uncommitted `Main.cpp` `progress`
+  tweak, reverted immediately after launching) rather than redoing the ~50 minutes of earlier stages.
+  The killed full-budget attempt's log and best mesh are preserved as
+  `runs/bottle1/run.log.full-attempt-killed` / `finalMesh.vtk.full-attempt-killed` for the record.
 
 *(This log entry is being written while the Bottle1 run is still in progress; final results will be
 added to both the Bottle1 table above and this section once it finishes.)*
