@@ -69,30 +69,42 @@ the paper's own algorithmic narrative (curvature/narrow-region assessment
 → octree generation → dualization → buffer clearing → buffer-zone
 projection/quality improvement).
 
-| Stage | bone (M4 reference run) | Bottle1 (M1, 2026-08-04) |
-|---|---|---|
-| Read surface mesh | ~0.4 s | 1.8 s |
-| Curvature and Narrow Region Assessment + Octree Generation (strongly balanced)¹ | ~38–39 s | **1062.2 s (~17.7 min)** |
-| Mesh Dualization | ~12–13 s | **1138.9 s (~19.0 min)** |
-| Buffer Clearing | ~13 s | **815.1 s (~13.6 min)** |
-| Buffer Zone Projection + Quality Improvement | ~200 s | *in progress* |
-| **Total** | **~4.5 min** | *pending* |
+| Stage | bone (M4, 2026-07-02) | bone (M1, 2026-08-04) | Bottle1 (M1, 2026-08-04) |
+|---|---|---|---|
+| Read surface mesh | ~0.4 s | 0.57 s | 1.8 s |
+| Curvature and Narrow Region Assessment | n/a¹ | 31.6 s | n/a¹ |
+| Octree Generation (strongly balanced) | n/a¹ | 19.6 s | n/a¹ |
+| — combined (curvature + octree)¹ | ~38–39 s | 51.2 s | **1062.2 s (~17.7 min)** |
+| Mesh Dualization | ~12–13 s | *pending* | **1138.9 s (~19.0 min)** |
+| Buffer Clearing | ~13 s | *pending* | **815.1 s (~13.6 min)** |
+| Buffer Zone Projection + Quality Improvement | ~200 s | *pending* | *in progress* |
+| **Total** | **~4.5 min** | *pending* | *pending* |
 
-¹ Reported as one combined number for both of these runs — both predate
-the timing-instrumentation split added later in this session (see summary
-log), which separates curvature/narrow-region assessment from octree
-balancing into two independently-timed stages for future runs (Bunny,
-etc.), not retroactively for this one.
+¹ The M4 bone run and the Bottle1 run both used a pre-split binary, so
+curvature/narrow-region assessment and octree balancing are only
+available as one combined number for those two ("— combined" row). The
+M1 bone run (added specifically to get a same-machine comparison point,
+and launched after the timing-instrumentation split) will report both
+substages separately — its combined-row cell is left as "—" once its two
+split values are known, to avoid double-counting.
 
 Every stage so far is dramatically slower than bone's, and by increasingly
 inconsistent factors relative to the ~3.5x element-count ratio: octree
-construction ~28x, dualization ~87x, buffer clearing ~63x. This pattern
-(large, non-uniform multipliers rather than a roughly constant ~3.5x
-across stages) points toward Bottle1's thin, coiled surface detail
-(handle/spiral thread, see Fig. 6(a) in the paper) triggering much deeper
-curvature-driven octree refinement than bone's simpler shape — i.e. the
-real driver is octree depth/leaf count, not final output element count,
-and that deeper octree then compounds through every downstream stage.
+construction ~28x (~21x against the M1 bone number), dualization ~87x,
+buffer clearing ~63x. This pattern (large, non-uniform multipliers rather
+than a roughly constant ~3.5x across stages) points toward Bottle1's thin,
+coiled surface detail (handle/spiral thread, see Fig. 6(a) in the paper)
+triggering much deeper curvature-driven octree refinement than bone's
+simpler shape — i.e. the real driver is octree depth/leaf count, not
+final output element count, and that deeper octree then compounds through
+every downstream stage.
+
+The M1-vs-M4 bone comparison also rules out "this M1 is just a slower
+machine" as the main explanation: bone's combined curvature+octree stage
+is only ~30% slower on this M1 than on the M4 (51.2 s vs. ~38–39 s) — a
+small, plausible hardware gap, nowhere close to Bottle1's 21–28x factor
+over bone on the *same* M1. So the dominant effect really is Bottle1's
+own geometry, not the machine.
 
 Bunny and the remaining Table 2 models will be added as their own sections
 below once Bottle1 is complete.
