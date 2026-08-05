@@ -74,12 +74,12 @@ convergence cap.** Two separate issues, not one:
    octree-depth parameter was touched. The M4 session that fixed
    `ProjectToIsoSurface` validated the *algorithm's* convergence behavior
    against `bone` but never checked its *output mesh size* against the
-   published number, so this gap went undetected until now. This looks
-   structurally similar to the already-documented gap in the sibling
-   `HexOpt` repo, where the publicly available code doesn't reproduce the
-   exact pipeline that generated its paper's published results — worth
-   raising with Hua Tong the same way, rather than assumed to be a local
-   bug, though it hasn't been confirmed which explanation is correct yet.
+   published number, so this gap went undetected until now.
+   **Root-caused 2026-08-05 — not a HexOpt-style missing-code gap after
+   all; see that day's summary log entry**: the shipped `C_THRES` curvature
+   thresholds don't match the paper's stated values, and separately, this
+   codebase's actual curvature computation doesn't match the paper's
+   stated formula either. Fixed by empirical recalibration (see below).
 2. **Worst SJ (0.010) reflects the deliberately-capped, under-converged
    run** (see the `MAX_PROJ_ITER` discussion below and in the summary
    log) — `ELEM_THRES` never advanced past its initial floor of `0.01`
@@ -212,9 +212,155 @@ Bunny and the remaining Table 2 models will be added as their own sections
 below once Bottle1's open questions (mesh-size mismatch, convergence
 budget) are resolved or at least better understood.
 
+## Bone (calibration testbed, not a Table 2 model)
+
+`bone` isn't one of Table 2's twelve models — it's the smallest sample in
+this repo's own broader `input boundaries`/`our results` collection, with
+published stats in this repo's own README rather than in the paper. The
+M4 session picked it as a fast iteration testbed for the
+`ProjectToIsoSurface` fix; the 2026-08-05 session reused it the same way,
+to calibrate `C_THRES` against a small, fast-to-rerun model before
+spending Bottle1-scale time on each attempt. See the summary log below for
+the full investigation; this table is the result.
+
+| `C_THRES` | Vertices | Elements | Worst SJ | Best SJ | Total time |
+|---|---|---|---|---|---|
+| **Published (this repo's README)** | **10,356** | **8,619** | **0.61** | 1.0 | — |
+| Buggy, shipped `{0,0,0.4,0.8,1.6}` (2026-08-04) | 19,639 (1.9x) | 16,590 (1.9x) | 0.590 | 1.0 | 419.5 s |
+| Paper-literal `{0.5,1,2,4,8}` (2026-08-05) | 4,584 (0.44x) | 3,570 (0.41x) | 0.550¹ | 1.0 | 117.75 s |
+| **v1.2 historical `{0.1,0.2,0.4,0.8,1.6}` (2026-08-05, adopted)** | **14,856 (1.43x)** | **12,608 (1.46x)** | **0.600** | 1.0 | 313.80 s |
+
+¹ An earlier run at this same `C_THRES` value, using a leftover
+`MAX_PROJ_ITER=20000` cap carried over from the Bottle1 work rather than
+bone's own established `200000` budget, produced worst SJ 0.011 —
+resolved once re-run with the correct budget (0.550, shown here),
+confirming that discrepancy was a convergence-budget confound, not a
+quality problem with the paper-literal thresholds themselves.
+
+v1.2's historical thresholds give the closest match on every metric
+simultaneously (size within ~1.5x, worst SJ within 0.01 of published) and
+were adopted for the Bottle1 redo. Neither the buggy nor the paper-literal
+values are being pursued further — see the summary log for why an exact
+match isn't expected from either given the curvature-formula mismatch.
+
 ## Summary log
 
 Entries are ordered most recent first.
+
+### 2026-08-05 — Root-causing the mesh-size mismatch; redoing bone and Bottle1 (Apple M1)
+
+The 2026-08-04 session's Bottle1 and bone runs both produced meshes far
+larger than published (Bottle1 ~6x, bone ~1.9x), left unexplained at the
+time. This session root-causes it and redoes both runs.
+
+**`C_THRES` mismatch, found by cross-referencing the paper against
+`Initialization.h`.** Section 2.1 of the paper (p.3) states the curvature
+refinement thresholds explicitly: *"Five curvature thresholds
+`Gthres = {0.5, 1, 2, 4, 8}` are adopted. If an octree cell at level `l+4`
+... satisfies `G(l+4) > Gthres[l]`, we refine it to level `l+5`."* The
+shipped `Initialization.h` (unmodified from upstream, current release
+"v1.3") had `C_THRES[5] = { 0, 0, 0.4, 0.8, 1.6 }` — nothing like the
+paper's stated values. Checking this file's git history across releases
+showed it never has matched, and got worse over time rather than better:
+
+| Release | `C_THRES` |
+|---|---|
+| v1.2 (`2e5f4c0`) | `{0.1, 0.2, 0.4, 0.8, 1.6, 3.2}` (6 levels) |
+| v1.2 (`f9e667c`) | `{0.1, 0.2, 0.4, 0.8, 1.6}` (dropped to 5) |
+| v1.3 (`220c53f`, shipped) | `{0, 0, 0.4, 0.8, 1.6}` (**first two zeroed**) |
+
+`H_THRES` (`{16, 8, 4, 2, 1}`) and `VOXEL_SIZE` (`10`) have been stable
+across every release and already match the paper's stated
+`Tthres = {16,8,4,2,1}` and its "resulting octree level ranges from 5 to
+9" — only `C_THRES` was the problem. Mechanism: the refinement rule is
+"refine if `G > threshold`". With `C_THRES[0] = C_THRES[1] = 0`, the
+condition `G(level 4) > 0` and `G(level 5) > 0` is true for essentially
+any curved region (Gaussian curvature is only exactly zero on flat
+patches), making the two coarsest refinement checks effectively
+unconditional — forcing far more of the octree to refine than the paper's
+thresholds intend, cascading into every downstream stage (more octree
+cells → more dual-mesh elements → proportionally slower dualization,
+buffer clearing, and projection).
+
+**Curvature formula/units mismatch, found by comparing the paper's stated
+formula against the actual implementation.** The paper's `G` is a
+cotangent-Laplacian magnitude normalized by local Voronoi cell area (units
+~ 1/length): `‖Σ (cot α + cot β)(Pj − Pi)‖ / (4·Ai)`. Searching the
+codebase for any cotangent- or Voronoi-based computation found none — the
+only curvature computation anywhere (`HexGen.cpp`, inside `ReadRawData`,
+called from `InitializeOctree`) is `r[point] += (dihedral_angle − π)²`,
+summed over each edge incident to that point, where `dihedral_angle` is
+the angle between the two triangle faces sharing that edge. This is a
+different mathematical quantity (squared angular deviation from flat, no
+area normalization, units of radians²) from the paper's stated formula
+(a normalized curvature magnitude, units ~ 1/length). Because of this,
+neither the buggy shipped thresholds nor the paper's literal `Gthres`
+values can be "provably correct" for what this code actually computes —
+there's no valid unit conversion between the two formulas. This explains
+why fixing `C_THRES` to the paper's literal values didn't land on the
+published mesh size either (see below) — empirical recalibration against
+published stats, not formula-derived threshold values, is the right path
+forward pending a possible future fix to the curvature formula itself
+(out of scope for this session).
+
+**Bone recalibration (see the Bone section above for the full results
+table).** Tested three `C_THRES` values against bone (this repo's own
+published 10,356 vertices / 8,619 elements / worst SJ 0.61), each with the
+full `MAX_PROJ_ITER=200000` budget (bone's own established setting — one
+intermediate run accidentally used a leftover `MAX_PROJ_ITER=20000` cap
+carried over from the 2026-08-04 Bottle1 work, caught and corrected before
+drawing conclusions from it):
+- Buggy shipped values: 1.9x too big, worst SJ 0.590 (close on quality,
+  wrong on size).
+- Paper-literal values: 2.3x too *small* — overshot in the other
+  direction — worst SJ 0.550 once re-run with the correct iteration
+  budget (an earlier run at 0.011 was purely the leftover-cap confound
+  described above, not a quality problem with these thresholds).
+- v1.2's historical values (a previously-shipped value from this repo's
+  own git history, not an arbitrary guess — chosen because it sits between
+  the other two): closest match on every metric simultaneously — 1.43-1.46x
+  on size, worst SJ 0.600 (within 0.01 of published). Adopted for the
+  Bottle1 redo.
+
+**Bottle1 redo, and a second, separate bottleneck found.** With
+`C_THRES` recalibrated, launched Bottle1 with the full `MAX_PROJ_ITER=
+200000` budget. Streamed per-stage completions live rather than polling
+after the fact. `GetCellValue()`'s curvature/narrow-region assessment
+substage alone took 724.4s (~12 min) — nearly as long as the *entire*
+combined octree stage took under the old buggy thresholds (1062s), and
+drastically disproportionate to bone's 11.0s for the same substage with
+the same thresholds (65.8x longer, vs. only ~2.45x more input triangles:
+29,664 vs. 12,088). Paused the run (killed after octree construction
+finished, ~34 min in) to investigate rather than let it continue on an
+unbounded timeline.
+
+**Root cause of the second bottleneck**: `GetCellValue()`'s
+thickness/narrow-region check (`HexGen.cpp:950-986`) is a brute-force
+all-pairs loop — for every triangle `i`, it ray-tests against every other
+triangle `j > i` (via `Intersect()`) with no spatial acceleration
+structure (no BVH/octree/kd-tree) and no early exit. This is exactly the
+paper's described operation ("shooting a ray... to find the shortest
+intersection with other triangular elements"), implemented as literal
+O(n²) over the input triangle count:
+- bone: 12,088 triangles → ~73M pairs → 11.0s.
+- Bottle1: 29,664 triangles (2.45x more) → ~440M pairs (**6.0x more**,
+  since O(n²)) → but observed **724.4s = 65.8x slower**, not 6.0x.
+
+O(n²) triangle-count scaling explains about 6x of the slowdown — the
+structural reason Bottle1 is inherently much worse than bone here, since
+it has more input triangles and this check is quadratic in that count —
+but there's a further **~11x unexplained** beyond that, not yet
+diagnosed; a leading candidate is `Intersect()` itself costing more per
+call on Bottle1's specific geometry (its thin coiled/spiral surface
+detail may trigger more expensive branches or near-degenerate cases in
+the ray-triangle test), but this hasn't been confirmed. This is a genuine
+performance bottleneck in the shipped algorithm's implementation, entirely
+unrelated to `C_THRES` calibration — it would affect any sufficiently
+detailed/dense input model, not just Bottle1, since it happens before the
+octree stage that consumes its output. Investigation of the ~11x factor
+is in progress; both Bottle1 reruns from this session
+(`runs/bottle1-v2/`, killed mid-run) are being kept alongside the
+2026-08-04 `runs/bottle1/` as before/after evidence.
 
 ### 2026-08-04 — Bottle1 reproduction attempt + timing instrumentation (Apple M1)
 
