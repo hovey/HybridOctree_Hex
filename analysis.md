@@ -520,6 +520,74 @@ mid-run; `runs/diag-bottle1/`, killed once diagnostic data was captured)
 are being kept alongside the 2026-08-04 `runs/bottle1/` as before/after
 evidence.
 
+**Synthesis: why Bottle1 has been so hard to reproduce.** With the
+`bottle1-v3` run (calibrated `C_THRES`, full `MAX_PROJ_ITER=200000`
+budget) still running past 3 hours and not yet finished — against Table
+2's reported 218s — it's worth stepping back and separating what's
+actually been fixed from what hasn't.
+
+*Two genuinely different problems, not one.* Mesh size (fixed, mostly)
+and runtime (still unsolved) turned out to be almost entirely
+independent. Fixing one didn't fix the other, which is itself
+informative.
+
+*Mesh size — root-caused and mostly fixed (see above).* The shipped
+`C_THRES` didn't match the paper's stated values, and separately, the
+codebase's actual curvature formula doesn't match the paper's stated
+formula either (a different, unnormalized quantity — no valid unit
+conversion between the two). Empirical recalibration against `bone`'s
+known-good published stats got size within ~1.5x and worst-SJ within
+0.01 — good enough, not exact, and exact reproduction was never really
+achievable this way without rewriting the curvature computation itself.
+
+*Runtime — this is the real story, and it's not explained by the mesh-size
+fix.* Fixing `C_THRES` barely moved the needle on runtime. Comparing
+`bone` (properly calibrated) against Bottle1 (also properly calibrated),
+same code, same machine:
+
+| Stage | bone (calibrated) | Bottle1 (calibrated) | Ratio |
+|---|---|---|---|
+| Octree construction | ~55 s | ~1012 s | ~18x |
+| Dual mesh generation | ~7 s | ~1046 s | ~150x |
+| Buffer clearing | ~8–22 s | ~785 s | ~36–100x |
+| Projection/quality | ~238 s | still running after 3+ hours | — |
+| **Total** | **~5.2 min** | **3+ hours and counting** | — |
+
+Bottle1 only has 2.45x more input triangles than bone. None of these
+ratios are anywhere close to 2.45x, or even the ~6x naive O(n²)-in-
+triangle-count reasoning would predict. The confirmed cause (not
+guessed — see the `ComputeCellValue()` instrumentation above) is that
+octree-cell classification does a brute-force linear scan with no
+spatial acceleration structure, and both the number of cells needing
+classification and the candidate-list sizes are inflated by Bottle1's
+more complex geometry, compounding multiplicatively. Dualization and
+buffer-clearing show the same disproportionate pattern and likely hide
+similar unaccelerated scans, though those haven't been isolated with
+the same direct instrumentation yet.
+
+*Why 218s is probably unreachable with the current public code at all.*
+Even a "perfectly calibrated" run of the current public code cannot
+plausibly finish in 218s. `bone` — a much smaller, simpler model — takes
+~5.2 minutes on its own, and its quality-improvement stage alone (238s)
+is already almost as long as Table 2's entire reported Bottle1 time. For
+Bottle1 to finish in 218s, whatever Tong actually ran would need spatial
+acceleration in `ComputeCellValue()` (and likely elsewhere) that simply
+isn't in the code currently on GitHub.
+
+This lines up with a pattern confirmed in *both* of Tong's public repos
+this session: `HexOpt`'s own README documents (with his own email
+confirmation) that the public `meshQuality.cpp` doesn't implement the
+method the CAD 2026 paper claims — and structurally, that code looks
+like it's actually derived from `HybridOctree_Hex`'s own older algorithm
+instead (see `hovey/HexOpt`'s README, 2026-08-05 entry). The most likely
+explanation for Bottle1's timing gap is the same shape of problem: the
+version of `HexGen.cpp` that's public doesn't have the optimizations
+that the version used to generate Table 2 had. This isn't a mistake in
+this reproduction's methodology — it's a real, structural gap between
+the published performance numbers and the current state of the public
+code, on top of the separate (now largely resolved) mesh-size
+calibration issue.
+
 ### 2026-08-04 — Bottle1 reproduction attempt + timing instrumentation (Apple M1)
 
 Picking up the M4 session's fixed `HexGen.cpp` to reproduce Table 2's Bottle1 row on a second machine
