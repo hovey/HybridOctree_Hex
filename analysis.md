@@ -399,9 +399,7 @@ match isn't expected from either given the curvature-formula mismatch.
 
 ## Summary log
 
-Entries are ordered most recent first. For a first read, the story
-actually unfolded in the opposite direction — here's that arc, oldest to
-newest, before the detailed entries below:
+*Ordered oldest to newest*
 
 **2026-07-02 – 2026-07-03 (Apple M4)**: got this fork building on macOS,
 then found and fixed a genuine upstream bug — `ProjectToIsoSurface()` had
@@ -436,7 +434,11 @@ structurally like `HybridOctree_Hex`'s own older algorithm, not the CAD
 2026 paper's claimed method, backed by a definitive date-based proof (see
 `hovey/HexOpt`'s README).
 
-Full details, newest first, below.
+## Detailed log
+
+*Ordered newest to oldest*
+
+---
 
 ### 2026-08-05 — Root-causing the mesh-size mismatch; redoing bone and Bottle1 (Apple M1)
 
@@ -809,6 +811,8 @@ propagation) are refuted or insufficient on their own; spatial dispersion
 of candidates shows a real but only partial effect. The ~12x
 Bottle1-vs-bone disparity in marked octree cells remains not fully
 explained.
+
+---
 
 ### 2026-08-04 — Bottle1 reproduction attempt + timing instrumentation (Apple M1)
 
