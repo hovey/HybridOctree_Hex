@@ -1021,6 +1021,21 @@ inline void hexGen::GetCellValue() {
 	// classification and the candidate-list sizes scale up with surface
 	// complexity and compound multiplicatively. See analysis.md's
 	// 2026-08-05 summary log for the full investigation.
+	// Note (2026-08-05): compared refineTriPt0's (coarsest tested level's
+	// candidate points) spatial bounding box against the full model's
+	// bounding box, to test whether Bottle1's candidates are more
+	// spatially dispersed across its geometry than bone's. Partial
+	// support, not a full explanation: Bottle1's candidates do span more
+	// of their model's bounding box (99.1% vs. bone's 71.6%) despite only
+	// ~1.93x more points, and are actually *sparser* in point-density
+	// terms (~0.625x bone's density) — but naively combining the count
+	// and bbox-coverage ratios only predicts a ~2.7x marked-cell
+	// difference, far short of the ~12.5x actually observed. Bounding-box
+	// coverage alone doesn't capture what `ComputeCellValue()` actually
+	// tests (discrete grid-cell occupancy, not convex-hull volume), so
+	// this likely underestimates true dispersion — a finer test (actual
+	// occupied-cell count on a fixed grid) would be needed to resolve
+	// this further. See analysis.md's summary log.
 	for (i = levelId[octreeDepth] - 1; i > -1; i--)
 		ComputeCellValue(i, getLevel[i]);
 }

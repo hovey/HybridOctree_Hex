@@ -732,6 +732,47 @@ removed from `HexGen.cpp`, replaced with a short permanent comment
 pointing to this finding; `diag-balance-bone/`/`diag-balance-bottle1/`
 and `build-balance-test/` were deleted after capturing the result.
 
+**Spatial-dispersion hypothesis tested (2026-08-05) — partial support,
+not a full explanation.** Tested candidate (b): are Bottle1's
+curvature/thickness candidate points more spatially *dispersed* across
+its geometry (touching many more distinct octree cells) rather than
+clustered, versus bone's? Instrumented `GetCellValue()` to compare
+`refineTriPt0`'s (the coarsest tested level's deduped candidate points)
+bounding box against the full model's bounding box, run *very* cheaply
+(only the O(n²) candidate-collection loop, well before the expensive
+`ComputeCellValue()` sweep — ~10-15s per model, not minutes):
+
+| | Candidate count | Candidate bbox / model bbox (volume) | Candidate density (pts/unit³) |
+|---|---|---|---|
+| bone | 3,134 | 71.6% | 0.0477 |
+| Bottle1 | 6,036 | 99.1% | 0.0299 |
+
+Bottle1's candidates do span nearly its entire bounding box (99.1% vs.
+bone's 71.6%) with only ~1.93x more points — and are actually *sparser*
+in point-density terms (~0.625x bone's density), consistent with being
+more spread out rather than clustered. But combining the count ratio
+(1.93x) and bbox-coverage ratio (1.38x) only predicts a ~2.7x
+marked-cell difference — far short of the ~12.5x actually observed
+before balancing. **Real effect, insufficient magnitude.** Bounding-box
+volume is a poor proxy for what `ComputeCellValue()` actually tests
+(discrete octree-cell occupancy at each level, not convex-hull volume) —
+a bounding box can be nearly full while still leaving most individual
+grid cells empty, so this test likely *understates* true dispersion.
+Resolving this further would need a finer test: actual occupied-cell
+counts on a fixed grid (e.g. voxelize `refineTriPt0` at the octree's own
+resolution and count non-empty voxels) rather than a single aggregate
+bounding-box ratio. Not done yet. The temporary bounding-box
+instrumentation has been removed from `HexGen.cpp`, replaced with a
+permanent comment; `diag-disp-bone/`, `diag-disp-bottle1/`, and
+`build-dispersion-test/` were deleted after capturing the result.
+
+**Status of the mesh-size investigation**: all three candidate
+hypotheses tested so far (`C_THRES`, `H_THRES`, octree-balancing
+propagation) are refuted or insufficient on their own; spatial dispersion
+of candidates shows a real but only partial effect. The ~12x
+Bottle1-vs-bone disparity in marked octree cells remains not fully
+explained.
+
 ### 2026-08-04 — Bottle1 reproduction attempt + timing instrumentation (Apple M1)
 
 Picking up the M4 session's fixed `HexGen.cpp` to reproduce Table 2's Bottle1 row on a second machine
