@@ -2,3 +2,4 @@
 build/
 build-*/
 scripts/scaled_jacobian_stats
+**/runs/*/*.vtk
