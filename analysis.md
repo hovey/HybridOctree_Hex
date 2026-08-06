@@ -399,7 +399,44 @@ match isn't expected from either given the curvature-formula mismatch.
 
 ## Summary log
 
-Entries are ordered most recent first.
+Entries are ordered most recent first. For a first read, the story
+actually unfolded in the opposite direction — here's that arc, oldest to
+newest, before the detailed entries below:
+
+**2026-07-02 – 2026-07-03 (Apple M4)**: got this fork building on macOS,
+then found and fixed a genuine upstream bug — `ProjectToIsoSurface()` had
+an infinite loop with no exit path, an unbounded quality-ratchet, and a
+convergence tolerance borrowed from an unrelated check. Fixed and
+verified against `bone`, the smallest sample model. Separately, this is
+also where the sibling `HexOpt` repo's own gap was first found (its
+public code doesn't implement the AL/L-BFGS/ReHQJ method its paper
+claims).
+
+**2026-08-04 (Apple M1)**: cloned the fork here, cleaned up ~600K lines of
+build cruft the M4 session had accidentally committed, and ran the first
+Bottle1 reproduction attempt. Result: a mesh ~6x too large and a worst
+scaled Jacobian far below Table 2's — the size gap unexplained at the
+time, the quality gap eventually traced to a deliberately reduced
+iteration budget.
+
+**2026-08-05 (Apple M1)**: root-caused the mesh-size gap to two separate
+issues — the shipped curvature thresholds didn't match the paper's
+stated values, and (independently) this codebase's curvature *formula*
+doesn't match the paper's stated formula either. Recalibrated
+empirically using `bone` as a fast testbed, which fixed `bone`'s
+mesh size well and got Bottle1's convergence *quality* to match closely
+— but Bottle1's mesh size and, especially, its runtime (~27x slower than
+`bone` even fully calibrated) remained largely unmoved. Spent most of
+the day testing *why*: three hypotheses for the over-refinement
+(`C_THRES` alone, `H_THRES` alone, octree-balancing propagation) were
+each tested and refuted, and a fourth (spatial dispersion of refinement
+candidates) showed a real but insufficient effect. Also traced a related
+finding in the sibling `HexOpt` repo: its restored optimizer code looks
+structurally like `HybridOctree_Hex`'s own older algorithm, not the CAD
+2026 paper's claimed method, backed by a definitive date-based proof (see
+`hovey/HexOpt`'s README).
+
+Full details, newest first, below.
 
 ### 2026-08-05 — Root-causing the mesh-size mismatch; redoing bone and Bottle1 (Apple M1)
 
