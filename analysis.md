@@ -411,8 +411,6 @@ match isn't expected from either given the curvature-formula mismatch.
 
 *Ordered newest to oldest*
 
----
-
 ### 2026-08-05 — Root-causing the mesh-size mismatch; redoing bone and Bottle1 (Apple M1)
 
 The 2026-08-04 session's Bottle1 and bone runs both produced meshes far
