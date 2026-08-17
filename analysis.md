@@ -406,10 +406,372 @@ match isn't expected from either given the curvature-formula mismatch.
 | 2026-07-02 – 2026-07-03 | M4 | Got this fork building on macOS, then found and fixed a genuine upstream bug — `ProjectToIsoSurface()` had an infinite loop with no exit path, an unbounded quality-ratchet, and a convergence tolerance borrowed from an unrelated check. Fixed and verified against `bone`, the smallest sample model. Separately, this is also where the sibling `HexOpt` repo's own gap was first found (its public code doesn't implement the AL/L-BFGS/ReHQJ method its paper claims). |
 | 2026-08-04 | M1 | Cloned the fork here, cleaned up ~600K lines of build cruft the M4 session had accidentally committed, and ran the first Bottle1 reproduction attempt. Result: a mesh ~6x too large and a worst scaled Jacobian far below Table 2's — the size gap unexplained at the time, the quality gap eventually traced to a deliberately reduced iteration budget. |
 | 2026-08-05 | M1 | Root-caused the mesh-size gap to two separate issues — the shipped curvature thresholds didn't match the paper's stated values, and (independently) this codebase's curvature *formula* doesn't match the paper's stated formula either.<br><br>Recalibrated empirically using `bone` as a fast testbed, which fixed `bone`'s mesh size well and got Bottle1's convergence *quality* to match closely — but Bottle1's mesh size and, especially, its runtime (~27x slower than `bone` even fully calibrated) remained largely unmoved.<br><br>Spent most of the day testing *why*, testing four hypotheses for the over-refinement:<ul><li>`C_THRES` alone — tested and refuted</li><li>`H_THRES` alone — tested and refuted</li><li>octree-balancing propagation — tested and refuted</li><li>spatial dispersion of refinement candidates — real but insufficient effect</li></ul>Also traced a related finding in the sibling `HexOpt` repo: its restored optimizer code looks structurally like `HybridOctree_Hex`'s own older algorithm, not the CAD 2026 paper's claimed method, backed by a definitive date-based proof (see `hovey/HexOpt`'s README). |
+| 2026-08-17 | M1 | Switched strategy from threshold-guessing to git archaeology. Found that the repo's `/our results/bottle1.vtk`, committed by the paper's first author Tong one day before the `v1.0` tag and never touched since, reproduces Table 2's Bottle1 numbers **exactly** (36,091 verts / 30,145 elems / worst SJ 0.560000 / best SJ 1.0, via `scaled_jacobian_stats`) — strong evidence it's the actual paper output file, not just a close match.<br><br>Statically diffed source across every upstream tag (`v1.0`→`v1.1`→`v1.2`→`v1.3`→current `HEAD`) and found the 2026-08-05 calibration work had anchored `C_THRES` to `v1.2`'s values — but `v1.0`/`v1.1`'s own original constants (`C_THRES={0.15,0.3,0.6,1.2,2.4}`, `VOXEL_SIZE=9`), the closest available source snapshot in time to the reference mesh, had never been tried.<br><br>Built and ran both `v1.0` and `v1.1` against the recovered original 2024-01-11 input surface. Both got permanently stuck at the same point in the final projection stage (never reached Table 2's numbers), which reframed the investigation: not a `v1.0`-vs-`v1.1` code-version question after all, but something about specific local geometry in Bottle1's input surface that this gradient-descent projection method can't resolve regardless of version.<br><br>Along the way, corrected two initial misreadings (see Detailed log for the full trail): `c291245` (2024-01-11, used for today's runs) has an off-by-one header bug that makes `ReadRawData()` silently duplicate its last triangle, while `f3247d8` (2024-01-16) parses cleanly; and `v1.1`'s new code block turned out to be a post-convergence step, not stuck-recovery logic, so it never actually ran in either attempt — the real cause of `v1.0`/`v1.1`'s differing exploration patterns is still open. `v1.1` left running as a low-priority background check; next step is a targeted dump of the local triangle neighborhood around the stuck point. |
 
 ## Detailed log
 
 *Ordered newest to oldest*
+
+### 2026-08-17 — Git archaeology: locating the exact paper-era reference mesh and source; `v1.0` reproduction build (Apple M1)
+
+**Goal for today:** stop guessing at thresholds and check whether git history itself holds the exact code and exact output from around the paper's submission time (2024-01-14 paper received, 2024-02-23 revised paper received, 2024-03-16 paper accepted) — specifically for Bottle1's Table 2 row (36,091 verts / 30,145 elems / worst SJ 0.560 / best SJ 1.0 / refinement level 4).
+
+**Finding 1 — the reference mesh already exists in this repo, untouched since the paper.**
+`our results/bottle1.vtk` was added in commit `be63d98` (upstream `CMU-CBML/HybridOctree_Hex`), authored by **Hua Tong** (the paper's first author) on **2024-01-11** — one day before the `v1.0` release tag (`db207d7`, 2024-01-12). It has never been modified since: `git log --all -- "our results/bottle1.vtk"` shows exactly one add commit and nothing else, all the way through today's `HEAD`. Running this fork's own `scripts/scaled_jacobian_stats` (built from `Sj()` copied verbatim out of `HexGen.cpp`) against it gives:
+
+```
+Points:   36091
+Cells:    30145 (30145 hex, 0 non-hex skipped)
+Worst SJ: 0.560000
+Best SJ:  1.000000
+```
+
+An exact match on all four numbers, not a rounding coincidence. This is almost certainly the literal file used to produce Table 2's Bottle1 row, and it's a better reproduction target than the paper's rounded printed numbers.
+
+**Finding 2 — the earliest committed source postdates that mesh by exactly 1 day.**
+The first commit touching `HexGen.cpp`/`Main.cpp` anywhere in git history is `44f730c` (2024-01-12) — the same day as the `v1.0` tag. The reference mesh was committed 2024-01-11 10:55:18 -0500 (`be63d98`), and `44f730c` followed 2024-01-12 00:08:33 -0500 — 1 calendar day later (13h 13m elapsed). So the source code wasn't even in the repo yet when the reference mesh was pushed; `v1.0` is the closest available snapshot, 1 day removed, not a proven-identical match.
+
+**Finding 3 — static diff across every release tag, to see what's actually changed.**
+Diffed `v1.0` → `v1.1` → `v1.2` → `v1.3` → current fork `HEAD` file-by-file. `Main.cpp`/`Mesh.cpp`/`Mesh.h` never change across the whole history; all real evolution is in `HexGen.cpp`/`HexGen.h`/`Initialization.h`. Upstream goes dormant after `v1.3` (2024-02-25) — no further code commits until this fork's own work starting 2026-08-04.
+
+| | `v1.0` = `v1.1` | `v1.2` | `v1.3` (= today's upstream default) | fork `HEAD` (pre-today) |
+|---|---|---|---|---|
+| `C_THRES` | `{0.15, 0.3, 0.6, 1.2, 2.4}` | `{0.1, 0.2, 0.4, 0.8, 1.6}` | `{0, 0, 0.4, 0.8, 1.6}` | `{0.1, 0.2, 0.4, 0.8, 1.6}` (= `v1.2`) |
+| `H_THRES` | `{16,8,4,2,1}` | same | same | same |
+| `VOXEL_SIZE` | **9** | **10** | 10 | 10 |
+| `MAX_NUM` | 10,000,000 | 100,000,000 | same | same |
+| `OUT_IN_RATIO` | 0.125 | 0.125 | **0.15** | 0.15 |
+
+`v1.1` also added a whole new randomized-retry block to `ProjectToIsoSurface` (absent from `v1.0`) and bumped `ELEM_THRES`'s first-trigger value 0.5→0.53 — a real algorithmic change, not just constants, and one `v1.0` doesn't have. Cross-checked against this file's own record of the 2026-08-05 work: that session calibrated against **`v1.2`'s** `C_THRES`, and separately tried the paper's literal stated `Gthres` and `v1.3`'s shipped (buggy) values — `VOXEL_SIZE` was noted as "stable" at 10 throughout. **To date, we have not tried to reproduce results with `v1.0`/`v1.1` original constants**, and they're the ones chronologically closest to whatever actually produced the reference mesh.
+
+**Finding 4 — the original input surface differs from what's in the working tree today.**
+`input boundaries/bottle1_tri.raw` was committed alongside the source on `c291245` (2024-01-11) and then edited on `f3247d8` (2024-01-16) — the version currently checked out in the working tree (as of today, 2026-08-17) is the *later* one. Diffing the two:
+
+```
+-14833 29665 // vertices, triangles c291245 (2024-01-11)
++14833 29664 // vertices, triangles f3247d8 (2024-01-16)
+```
+
+**The 2024-01-11 original (14,833 vertices / 29,665 triangles) declares
+one more triangle than the file in today's (2026-08-17) working tree
+(14,833 vertices / 29,664 triangles).** Same vertex count, one fewer
+declared triangle.
+
+**What each file actually contains, and which
+one is correct.**
+
+- Both `c291245` (2024-01-11) and `f3247d8` (2024-01-16) contain
+  **byte-identical triangle data** — 29,664 physical triangle lines,
+  line-for-line the same in both. No triangle was added, deleted, or
+  edited between the two commits.
+- The only difference is the declared count on the header line:
+  `c291245` (2024-01-11) says `29665`; `f3247d8` (2024-01-16) says
+  `29664`.
+- `f3247d8` (2024-01-16) is **correct** — its header matches the file's
+  true physical triangle count exactly.
+- `c291245` (2024-01-11) is **incorrect** — its header overstates the
+  true count by 1.
+- Consequence: `ReadRawData()` reads exactly `elements` (the header
+  count) lines into a single reused buffer, without checking `fgets()`'s
+  return value. On `c291245` (2024-01-11), the extra declared line runs
+  past EOF, `fgets()` fails silently, and `sscanf()` re-parses the stale
+  buffer — silently **duplicating the file's true last triangle**
+  (`14729 14727 14725`) into the loaded mesh a second time. `f3247d8`
+  (2024-01-16) loads cleanly with no duplication.
+- That duplicated triangle is a real sliver (area 1.40×10⁻⁵, aspect
+  ratio 3.02) whose centroid sits ~0.027 units from the stuck-projection
+  points' centroid (Correction above) — spatially close, but at a
+  different location in the triangle list (indices 29663/29664 vs.
+  `#1357`/`#1351`), so unlikely to be the direct cause of that plateau.
+
+**Practical implication for today's runs.** Both `v1.0` and `v1.1` were
+launched against `c291245` (2024-01-11) — the incorrect file — because
+it's temporally closer to the reference mesh's 2024-01-11 generation
+date. `f3247d8` (2024-01-16) is the correct file but 5 days further
+from that date. This time-vs-correctness trade-off is unresolved; an
+untried variant is rerunning against `f3247d8` (2024-01-16) instead.
+
+**Action taken — built and launched `v1.0` against the original input.**
+1. Extracted `v1.0`'s tagged source tree (`HexGen.cpp/h`, `Main.cpp`, `Mesh.cpp/h`, `Initialization.h`, `StaticVars.h`, `CellQueue.h`, `CMakeLists.txt`, `ErrorMessage.txt`) into a new `HybridOctree_Hex_v1.0/` directory at the repo root.
+2. Patched two portability issues only, no logic changes: `sscanf_s`→`sscanf` (15 call sites — the exact same fix `v1.1` itself made one version later) and the Windows-only `<malloc.h>` in `CellQueue.h`→`<cstdlib>`/`<cstring>`.
+3. Built clean with CMake + AppleClang (same cosmetic-only warning classes already seen building the fork's `HEAD` — stray `#endif` tokens, `RAND_MAX` int→float narrowing, one dangling-else).
+4. Recovered the original 2024-01-11 `bottle1_tri.raw` from commit `c291245` (2024-01-11) and set up `HybridOctree_Hex/runs/bottle1-v1.0-repro/model.raw`.
+5. Launched `./HexGen` there in the background, log at `runs/bottle1-v1.0-repro/run.log`, monitoring for stage transitions and the `Try:0 ...` convergence-checkpoint lines that trigger this version's own `finalMesh.vtk` snapshot write (confirmed present in `v1.0`'s `ProjectToIsoSurface`, same mechanism the 2026-08-05 session relied on for `HEAD`).
+
+**Progress — octree construction stage complete.**
+
+```
+Time elapsed for reading surface mesh: 2.39245
+Number of unbalanced nodes: 529 → 90 → 0
+Time elapsed for constructing octree: 2167.96
+```
+
+`v1.0` doesn't print curvature/narrow-region assessment and octree
+balancing as separate timings the way the fork's later-instrumented code
+does — this 2167.96 s (~36.1 min) is the combined figure, comparable to
+the "— combined (curvature + octree)" row in the Bottle1 pipeline timings
+table above. That row was 1012.4 s (~16.9 min) for the 2026-08-05
+`v1.2`-calibrated run and 1062.2 s (~17.7 min) for the 2026-08-04
+buggy/capped run — so `v1.0`, despite its *coarser* `VOXEL_SIZE=9` (vs.
+10), is taking roughly 2x longer for this combined stage than either
+later-code run. Noted as a raw observation for now, not yet a hypothesis —
+worth returning to once we see whether the mesh-size/quality outcome
+actually matches, since a timing anomaly on its own doesn't tell us
+much.
+
+**Progress — mesh dualization complete.**
+
+```
+Time elapsed for generating dual mesh: 343.372
+```
+
+343.4 s (~5.7 min) — this time *faster* than either later-code run
+(1045.8 s for the `v1.2`-calibrated run, 1138.9 s for the buggy/capped
+run), the opposite direction from the octree-construction stage above.
+So `v1.0` isn't uniformly slower or faster than the later code — it's
+mixed by stage, which argues against a single blanket explanation (e.g.
+"this whole version is slow") and toward stage-specific algorithmic
+differences. Not investigating further mid-run; flagging for later.
+
+**Progress — buffer-zone clearing complete.**
+
+```
+Time elapsed for extracting interior dual mesh: 333.143
+```
+
+333.1 s (~5.6 min) — again faster than both later-code runs (785.0 s
+calibrated, 815.1 s buggy/capped), consistent with the dualization
+stage's direction rather than the octree-construction stage's. Only the
+octree-construction stage has run slower in `v1.0` so far; every other
+stage completed has run faster.
+
+**Progress — projection stage shows a sustained plateau on a single
+point.**
+
+`smallDist` (the worst-point projection distance; needs to drop below
+`DIST_THRES2` ≈ 1e-6 to trigger a `finalMesh.vtk` write) fell fast at
+first, 7.10 → 0.57 over the first ~50 outer iterations, then plateaued.
+For iterations ~60–105 the worst point has been stuck at the same index
+(1357), creeping only 0.617 → 0.607 over 45+ iterations — essentially
+flat, `k` (bad-element count) oscillating between 1 and 3, never reaching
+0. 1h39m elapsed (~99 min CPU time) at time of writing.
+
+This lines up with a finding from the source diff (Finding 3 above):
+`v1.1` added a whole new randomized-perturbation retry block to this
+exact function, five days after `v1.0`, specifically for cases where the
+gradient-descent projection gets stuck. `v1.0` doesn't have that block.
+Bottle1's thin, coiled, genus-1 geometry is a plausible candidate for
+triggering exactly this failure mode. **Working hypothesis, not yet
+confirmed:** `v1.0` may not converge on Bottle1 at all without that fix —
+which would explain why `v1.1` exists five days later, and would mean
+`v1.1`, not `v1.0`, is the real target to reproduce against, despite
+being one step further from the reference mesh's commit date.
+
+**Next step:** let `v1.0` keep running a while longer to see if it
+eventually breaks the plateau on its own (worth ruling out before
+concluding it's stuck for good), while building and launching `v1.1`
+in parallel against the same original input for direct comparison.
+
+**`v1.1` build and launch.** `v1.1` needed zero portability patches —
+it already uses `sscanf` (not `_s`) and `<stdlib.h>` (not `<malloc.h>`)
+upstream, both fixes `v1.0` needed manually. Built clean with CMake +
+AppleClang, same cosmetic-only warnings as `v1.0`. Extracted the same
+original 2024-01-11 `bottle1_tri.raw` input and launched
+`HybridOctree_Hex/runs/bottle1-v1.1-repro/`, running in parallel with
+the still-active `v1.0` run rather than stopping it first — `v1.0`
+hadn't yet ruled itself out as merely slow, so keeping it running costs
+nothing and preserves the option to compare both outcomes directly.
+
+**`v1.0` plateau update:** ~75 outer iterations in on point 1357 now
+(spanning heartbeats #61 through #121), `smallDist` essentially flat in
+the 0.61–0.62 band the whole time. The plateau is holding, not
+transient.
+
+**`v1.0` conclusion — genuinely stuck, not merely slow. Killed after
+2h23m.** Close inspection of the last 100 outer iterations before
+killing it: the worst point was **exactly one of two indices** (1351,
+1357) for the entire span, `smallDist` confined to a narrow band
+(0.6075–0.6437), and several stretches show bit-identical repeated
+values across a dozen or more consecutive iterations (e.g. `0.643725,
+1351` twelve times running) — the optimizer proposing the same move and
+landing on the same result, not gradual convergence that's merely slow.
+`v1.0` clearly lacks `v1.1`'s randomized-perturbation retry logic for
+exactly this function, and this confirms `v1.0` itself gets stuck.
+Killed the process (PID 97785) rather than let it keep burning CPU with
+no expectation of a different outcome.
+
+*Caveat added after the fact, once `v1.1` was tried (see below): the
+next two sentences, as originally written here, overclaimed — "clean
+confirmation of the hypothesis" and "makes `v1.1` the real reproduction
+target" both implied that having the retry logic would let `v1.1`
+escape where `v1.0` couldn't. That turned out to be false: `v1.1` got
+stuck at the same two points too. What's actually confirmed is only
+that `v1.0` gets stuck and lacks that logic — not that the logic's
+absence is sufficient to explain the stuck-ness, since its presence in
+`v1.1` didn't prevent the same outcome. Left the original reasoning
+below rather than delete it, since it's what the run's own killing was
+based on and it wasn't unreasonable given the evidence at the time —
+just superseded by the `v1.1` result a few sections down.*
+
+**`v1.1` projection stage — encouraging early signal.** Octree
+construction (2203.26 s), dualization (345.5 s), and buffer clearing
+(334.8 s) all closely matched `v1.0`'s timings, as expected from
+identical upstream constants and code up to this point. The projection
+stage started from the identical first point (`Try:0 7.0984 4244`, same
+as `v1.0`'s first iteration) and, after ~90 outer iterations, landed on
+the **same hard point `v1.0` got permanently stuck on (index 1357)** —
+but here the comparison diverges. Looking at the raw log (not just
+throttled heartbeats) over the last 40 outer iterations: 36 distinct
+`smallDist` values, a slow downward drift (~0.60 → ~0.58), and two
+`Try:0` hits (momentary zero bad-elements, at 0.5838 and 0.5661) —
+versus `v1.0`'s later behavior on the same point, which showed
+bit-identical repeated values across a dozen or more consecutive
+iterations. `v1.1`'s randomized-retry logic (Finding 3, the block absent
+from `v1.0`) appears to be doing exactly what it looks designed to do —
+landing on the same hard point but continuing to perturb and explore
+rather than freezing there. Not converged yet, but a clearly different
+— and more promising — trajectory than `v1.0` showed at the equivalent
+point. Continuing to watch.
+
+**`v1.1` revised conclusion — also stuck, on the same two points.**
+The encouraging trajectory above didn't hold. By ~2h07m elapsed (219
+outer iterations), the raw log shows the same freezing signature `v1.0`
+showed: bit-identical `smallDist` values repeated up to 7 times running
+(e.g. `0.611346, 1351` ×7), oscillating between **the same two points
+`v1.0` got permanently stuck on** — 1357 and 1351. No `finalMesh.vtk`
+written. `v1.1`'s randomized-retry logic clearly changed the *path*
+(more exploration, `Try:0` hits along the way, slower to freeze) but not
+the *outcome* — it delayed the same plateau rather than escaping it.
+
+This reframes the working hypothesis from Finding 3. It's likely not
+primarily a `v1.0`-vs-`v1.1` code-version story — both versions
+converge on the same trap. More likely explanation: something specific
+to the local geometry near this spot in the input surface (a genuinely
+hard configuration for this gradient-descent-based projection method,
+independent of which release runs it). Both `v1.1` (PID 222) and the
+earlier-killed `v1.0` attempt agree on the same two problem values,
+which is itself a useful, reproducible data point.
+
+**Correction — the "`v1.1` has retry/escape logic `v1.0` lacks"
+framing, repeated several times above, is wrong.** Went back to verify
+it against the source directly rather than let it stand. The block
+`v1.1` actually adds (the ~90-line randomized-perturbation block quoted
+in Finding 3) is nested **inside** the `if (k == 0 && smallDist <
+DIST_THRES2)` branch — i.e. it only runs *after* the projection has
+already converged (zero bad elements and the worst point within ~1e-6
+of its target), immediately before writing `finalMesh.vtk`. It's a
+post-convergence quality-polish/redistribution pass, not a
+stuck-recovery mechanism. Neither `v1.0` nor `v1.1` ever reached that
+gate in these runs (`smallDist` never got anywhere near 1e-6 in either)
+— so this block **never executed in either run**, and cannot explain
+why one got stuck harder than the other.
+
+Checked what actually *does* run during the stuck phase: a separate,
+pre-existing periodic redistribution block (`if (i % UPDATE_EVERY == 0)
+{ if (ELEM_THRES == 0.01) { ... rand()-based blending toward neighbor
+centroids ... } }`, around line 4339 in both versions) that already
+uses `rand()` and is gated only on `ELEM_THRES == 0.01` — the state both
+stuck runs are actually in. This block is **present and identical in
+both `v1.0` and `v1.1`**; it isn't part of the `v1.0`→`v1.1` diff at
+all. Also checked for `srand()` anywhere in either version: there is
+none, so `rand()` is unseeded in both.
+
+Net effect: there is no version-level code difference that explains
+either run's stuck-ness, or why `v1.1` showed more exploration before
+landing on the same trap `v1.0` did. That difference in intermediate
+behavior is real (documented above) but currently **unexplained** —
+worth being honest that this is an open question rather than
+attributing it to a mechanism that, on inspection, never ran. Every
+"retry logic"/"escape logic" claim earlier in this entry should be read
+with this correction in mind; not rewriting them out of the
+chronological record, but this note supersedes that framing.
+
+**Correction on what "1357"/"1351" actually are.** They aren't octree
+vertex indices — checked the source (`ProjectToIsoSurface`'s
+`triNum[j] = k` assignment, `HexGen.cpp`): the third field in each
+`Try:` line is an index into the **input triangle mesh**
+(`triMesh.e[]`), the closest surface triangle the current worst octree
+boundary point is being projected toward. So the log is saying "the
+worst point right now is closest to input-surface triangle #1357 (or
+#1351)," not naming a fixed octree vertex.
+
+**Investigated triangles #1357 and #1351 (0-based) directly in the
+original `bottle1_tri.raw`:**
+
+```
+Tri#1357 = (v553, v566, v552)   area=2.92e-04  edges=[0.0191,0.0337,0.0309]  aspect=1.76
+Tri#1351 = (v549, v552, v566)   area=3.05e-04  edges=[0.0332,0.0202,0.0309]  aspect=1.65
+```
+
+The two triangles **share an edge** (v552–v566) — they're immediate
+neighbors on the surface, not unrelated trouble spots. Their normals are
+nearly parallel (dihedral angle 0.63°, essentially coplanar) and neither
+is a sliver by shape (aspect ratios 1.65–1.76 are unremarkable). So the
+plateau isn't obviously explained by a folded or degenerate pair of
+triangles at this exact spot.
+
+A more likely mechanical explanation: the worst boundary point may be
+sitting almost exactly on the shared edge between these two triangles,
+so which one counts as "closest" flips back and forth under small
+perturbations — that would produce exactly the observed oscillation
+between triNum 1357 and 1351 without needing any local mesh defect at
+all, just a nearest-triangle assignment ambiguity at a shared edge.
+
+**Next step:** either let `v1.1` keep running as a low-priority
+background check (it hasn't fully proven it will never escape, just
+that it hasn't in ~240 iterations), or set up a more targeted diagnostic
+— dump the full local triangle neighborhood around v549/v552/v553/v566
+(one or two rings out) and check for anything more systematically odd
+about this patch's tessellation than the two irregularities found so
+far.
+
+**`v1.1` (PID 222) killed at 400 outer iterations, 3h13m elapsed
+(193m13s CPU time), still confined to the same two points (1351,
+1357) with no escape.** Final state, from the live `projHex.vtk`
+snapshot just before the kill:
+
+| Metric | `v1.1` at kill |
+|---|---|
+| Vertices | 117,031 |
+| Elements | 101,688 |
+| Worst SJ | -0.917028 |
+| Best SJ | 1.000000 |
+| Running time | 3h13m elapsed / 193m13s CPU time |
+
+Worst SJ had actually gotten *worse* since the last check earlier today
+(-0.313 → -0.917) — consistent with a genuine plateau rather than slow
+net improvement: the optimizer is still perturbing elements, just not
+converging. Vertex/element counts unchanged from the earlier snapshot
+(117,031/101,688), confirming the mesh size itself was already settled;
+only the projection/quality stage was still (unsuccessfully) iterating.
+No `finalMesh.vtk` was ever written by either `v1.0` or `v1.1` today.
+
+**Checked the live mesh snapshots directly — a genuinely positive
+data point on mesh size, despite the stuck projection.** Both
+`v1.0`/`v1.1` write periodic live snapshots to `projHex.vtk` in their
+run folders (a separate, unconditional-on-convergence write, distinct
+from the `finalMesh.vtk` checkpoint — `WriteToVtk(fileName, ...)` every
+`UPDATE_EVERY` inner iterations, `HexGen.cpp` ~line 4325). Checked both
+with `scaled_jacobian_stats`:
+
+| | `v1.0` (last snapshot before kill) | `v1.1` (live, at this point in the day) | Table 2 target |
+|---|---|---|---|
+| Vertices | 117,031 | 117,031 | 36,091 |
+| Elements | 101,688 | 101,688 | 30,145 |
+| Worst SJ | -0.358409 | -0.313405 | 0.560 |
+| Best SJ | 1.0 | 1.0 | 1.0 |
+
+Identical vertex/element counts between the two, as expected (same
+octree/dualization/buffer-clearing pipeline and constants up to this
+point). Worst SJ negative in both — expected mid-projection, not yet
+converged. But the mesh **size** is only ~3.2–3.4x larger than Table
+2's target — notably better than the earlier fork's `v1.2`-anchored
+2026-08-05 calibration attempt, which came in ~6x oversized
+(212,990/186,832). So even with the projection stage stuck, the
+`v1.0`/`v1.1` original-constants lead is already producing a
+meaningfully closer-sized octree than anything tried before today —
+independent evidence this lead is on the right track, separate from
+whatever's causing the projection plateau.
 
 ### 2026-08-05 — Root-causing the mesh-size mismatch; redoing bone and Bottle1 (Apple M1)
 
