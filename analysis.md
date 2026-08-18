@@ -535,16 +535,26 @@ not yet resolved.
    land — the `dualHex.vtk`-is-not-final caveat above means none of this
    session's "final" numbers should be trusted until read from an actual
    `finalMesh.vtk`.
-2. **The decisive cross-model test**: does `rl4-halfshift-cd75`'s
-   scale-relative correction (`C×√2`, `H÷√2`) *also* reproduce Bottle1? If
-   yes, one universal rule replaces Finding 14's two Bottle1-specific,
-   evidence-ambiguous compensations. If no, the thresholds are genuinely
-   per-model and Table 2 is not reproducible from the public constants
-   alone — a launched, still-running cross-validation run,
-   `runs/bottle1-v1.0-rl4-halfshift-cd75/` (input `f3247d8`, the
-   header-correct file established in Finding 13), is in flight as of this
-   entry.
-3. **Close Bunny's residual gap**, once (2) is answered: at
+2. **The decisive cross-model test — answered, negatively, within this
+   same session.** `runs/bottle1-v1.0-rl4-halfshift-cd75/` (input
+   `f3247d8`, the header-correct file from Finding 13) was built and run
+   against Bottle1 using the exact half-level correction that looked
+   promising on Bunny. Result: **19,971 / 16,617** against Bottle1's
+   target 36,091 / 30,145 — a **45% undershoot**, far worse than Bottle1's
+   own Finding-14 recipe (−1.5%/−0.7%), and in the opposite direction from
+   Bunny's ~+70% overshoot under Bottle1's recipe. So neither model's
+   threshold set works on the other: **the thresholds are genuinely
+   per-model, not one universal scale-relative rule.** That's a real
+   answer, not an open thread — worth stating plainly rather than
+   continuing to search for a single formula that fits every model. It
+   also reframes the "publishable conclusion" possibility Finding 14
+   already flagged: `our results/*.vtk` were generated with per-model
+   settings some time before 2024-01-11, one day before any source was
+   committed, and are not reproducible from the public `v1.0` constants
+   alone with any single choice of ladder-scaling rule tried so far.
+3. **Close Bunny's residual gap regardless** — this is a per-model fit now,
+   same as Bottle1's `CELL_DETECT`/`H[3]` ambiguity, not a universal rule,
+   but still worth nailing down for Bunny's own row. At
    `rl4-halfshift-cd75` settings, tier 3 was confirmed purely
    curvature-gated (31 curvature candidates, 0 thickness candidates via
    `refine_criteria_stats`), so the remaining ~8% undershoot is a
