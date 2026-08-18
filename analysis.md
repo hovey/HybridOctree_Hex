@@ -630,6 +630,116 @@ were adopted for the Bottle1 redo. Neither the buggy nor the paper-literal
 values are being pursued further — see the summary log for why an exact
 match isn't expected from either given the curvature-formula mismatch.
 
+## Synthesis: what `bone`, Bottle1, and Bunny collectively show
+
+Three models, three different outcomes, now that all three have been
+pushed as far as this investigation has taken them. Putting them side by
+side is more informative than any one of them alone.
+
+| | `bone` | Bottle1 | Bunny |
+|---|---|---|---|
+| Genus | 0 | 1 | 0 |
+| Table 2 refinement level | — (not in Table 2) | 4 | 4 |
+| Ladder needed | shipped defaults, unmodified | `VOXEL_SIZE_VALUE=7`, `LADDER_TOP=octreeDepth` (4 tiers) | same as Bottle1 |
+| `C_THRES` needed | shipped, unmodified | shipped, unmodified | needs its own scale correction — shipped is far too loose |
+| `H_THRES` needed | shipped, unmodified | shipped, ×2 | between ×1 and ×√2 (own correction, still being narrowed) |
+| `CELL_DETECT` needed | shipped (1), unmodified | 0.75 | 0.75 (borrowed from Bottle1 — untested whether it's even right) |
+| Result | **exact** — byte-identical cell connectivity | within 1.5% / 0.7% | within ~8% so far, narrowing |
+
+**Finding that holds up, independently, on every model tried: "Refinement
+Level" is a real, measurable, model-invariant property — the depth of the
+octree ladder — not a tuning knob.** It was first read off Bottle1's
+reference mesh by measuring cell edge lengths (Finding 10), then confirmed
+the same way on Bunny at the start of this session, and now confirmed a
+third, stronger way on both models: actually *running* the wrong tier
+count rather than just inferring it from the reference. Bottle1 at five
+tiers overshoots 3.4x (Finding 11); Bunny at five tiers overshoots 5.8x
+(`vs8abs`, this session). Both failures are catastrophic and in the same
+direction, which is exactly what a genuinely model-invariant setting
+predicts when it's set wrong. `bone` fits the same picture from the other
+side — it's the one model whose correct ladder happens to be the shipped
+default, which is why it's the one model this repo reproduces exactly
+with zero modification.
+
+**Finding that does not hold up: any single rule for the threshold**
+values (`C_THRES`, `H_THRES`, `CELL_DETECT`) **that sit inside that
+ladder.** `bone` needs the shipped values verbatim. Bottle1 needs the
+shipped `C_THRES` but a doubled `H_THRES` and a narrowed `CELL_DETECT`.
+Bunny needs neither of Bottle1's corrections — applying them overshoots by
+70-82% — but a `√2`-scale correction invented to fit Bunny then
+undershoots Bottle1 by 45% when cross-applied, the opposite direction from
+Bunny's own error under Bottle1's recipe. Three models, three different
+threshold regimes, and every cross-model transfer attempted so far — exact
+reuse, ×2, ×√2 — has failed in one direction or the other. This isn't for
+lack of trying a reasonable hypothesis: `H_THRES[i] = 2.56 × cellsize`
+being a genuine scale-relative invariant (Finding 12) was a real, principled
+pattern discovered from bone/Bottle1's own numbers, not a guess — it just
+doesn't transfer to a third model, which is a stronger and more useful
+result than confirming it would have been.
+
+**What this means for reproducing the paper.** These aren't equally
+weighted findings — the ladder-depth result is now backed by three models
+and two independent measurement methods each, about as solid as anything
+in this log; the threshold-transfer failure is backed by exactly one
+cross-check in each direction (Bottle1→Bunny, Bunny→Bottle1) and could in
+principle still yield to a smarter rule nobody's tried yet. But taken at
+face value, together they say something specific: **the algorithm in the
+one surviving source snapshot (`v1.0`) is not broken, and is not the kind
+of gap the sibling `HexOpt` repo has** (public code implementing a
+materially different method than the one the paper claims). Given the
+right inputs, this code reproduces the paper's own output either exactly
+(`bone`) or within a fraction of a percent (Bottle1). What's missing is
+narrower and more mundane than a broken algorithm: a set of per-model
+threshold values that were evidently hand-tuned by the paper's author
+before any source was ever committed — the reference meshes for `bone`,
+Bottle1, and Bunny were all committed by Hua Tong on the same day
+(2024-01-11), a full day before `44f730c`, the first commit to touch
+`HexGen.cpp`/`Main.cpp` at all (Finding 2) — and were never captured
+anywhere in git. Table 2 itself only reports the *outcome* of that tuning
+(vertex/element counts, SJ range, refinement level, time), not the
+`C_THRES`/`H_THRES`/`CELL_DETECT` inputs that produced it, so there is no
+document, public or private, that records what those per-model values
+actually were. Reproducing Table 2 as a whole is therefore not a single
+mechanical exercise — it is, at minimum, a per-model parameter-fitting
+problem, and at most twelve separate small ones.
+
+**A practical recipe for the next model, distilled from what worked
+across all three:**
+
+1. **Pin the ladder first, and trust it.** Measure the reference mesh's
+   deepest real octree level (12-edge-mean metric — see the level-metric
+   caveat above; a single-edge proxy will mislead) to set
+   `VOXEL_SIZE_VALUE`/`LADDER_TOP`, per the derived table above. This step
+   has been right on every model checked so far and is cheap to get
+   right — an octree-only run, without waiting for projection, is enough
+   to confirm it (as `vs8abs` did for Bunny).
+2. **Don't assume a distortion tail is a real tier.** A small
+   (2-4%), spatially diffuse population at one level deeper than the main
+   mass of the mesh has now been seen — and confirmed as an artifact, not
+   real refinement — on both Bottle1 (Finding 11, statistical/spatial
+   argument) and Bunny (this session, an actual run at the deeper setting
+   that overshoots by 5-6x). Treat it as the default explanation, not the
+   exception.
+3. **Treat `C_THRES`/`H_THRES`/`CELL_DETECT` as a small fitting problem,
+   not a lookup.** `refine_criteria_stats` sweeps candidate counts in
+   single-digit seconds, versus the 5-40+ minute octree stage alone for a
+   full run — use it to narrow the threshold search before committing to
+   an expensive end-to-end run. The per-tier refined-parent-count
+   diagnostic introduced this session (recursing a level's leaf count
+   upward, `N/8` per tier, and comparing tier-by-tier against the
+   reference) is sharper than comparing mesh totals, because it localizes
+   *which* tier is off rather than just *how much*.
+4. **Budget for a stall.** Every model attempted long enough has hit a
+   multi-hour plateau in `ProjectToIsoSurface` at some configuration —
+   Bottle1's original input (Finding 13, resolved: a genuine duplicate-
+   triangle bug) and, this session, two of Bunny's six configurations
+   (unresolved — `bunny_tri.raw` has no known input defect, so this looks
+   like a harder, still-open question about the gradient-descent
+   projection method itself). A `finalMesh.vtk` that never arrives isn't
+   necessarily a dead end: `projHex.vtk`'s point/cell count stabilizing
+   over a long plateau is usable evidence that the mesh *topology* has
+   settled even without full point-position convergence.
+
 ## Summary log
 
 *Ordered oldest to newest*
