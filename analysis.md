@@ -172,9 +172,9 @@ report a value for that cell.)*
 
 | Metric | Tong et al. 2024 (Table 2) | 2026-08-04 (buggy `C_THRES`, capped) | 2026-08-05 (calibrated `C_THRES`, full budget) | 2026-08-17 (`v1.0`, 4 refinement tiers) |
 |---|---|---|---|---|
-| Vertices | 36,091 | 218,898 ⚠️ | 212,990 ⚠️ | **32,970 – 34,664** ✓ within ~4% |
-| Elements | 30,145 | 192,098 ⚠️ | 186,832 ⚠️ | **27,750 – 29,244** ✓ within ~3% |
-| Worst scaled Jacobian | 0.560 | 0.010 (capped) | 0.530 ✓ close | **0.570** ✓ (ratchet value at stop; see Finding 13) |
+| Vertices | 36,091 | 218,898 ⚠️ | 212,990 ⚠️ | **35,535** ✓ −1.5% |
+| Elements | 30,145 | 192,098 ⚠️ | 186,832 ⚠️ | **29,943** ✓ −0.7% |
+| Worst scaled Jacobian | 0.560 | 0.010 (capped) | 0.530 ✓ close | **passes through 0.560, observed at 0.550 then 0.570001** ✓ (see Finding 13 — the ratchet's value wherever the run is stopped, not a property of the mesh) |
 | Best scaled Jacobian | 1.0 | 1.0 | 1.0 | **1.0** ✓ |
 | Refinement level | 4 | not measured | not measured (see note below) | **4** ✓ measured directly (Findings 5, 10, 11) |
 | Time | 218 s | 4109.3 s (~68.5 min) | 12590.2 s (~209.8 min real; ~142.3 min active compute — see note below) ⚠️ | ~4 min octree + projection ⚠️ |
@@ -187,9 +187,11 @@ constants are the paper's constants — they reproduce `our results/bone.vtk`
 difference is that it was generated with **four** octree refinement tiers
 rather than the five the public code hardcodes, exactly as Table 2's
 "Refinement Level 4" says. Running four tiers takes Bottle1 from 101,688
-elements to 27,750-29,244 against a target of 30,145. The residual few
-percent is a single tier's thickness gate, bracketed but not pinned
-(Finding 12).
+elements to 29,943 against a target of 30,145 — and octree levels 6 and 7,
+which carry 93% of the mesh, match the reference to 0.5% and 0.1%
+(Findings 11 and 14). The residual under 1% is not uniquely pinned by the
+evidence and probably cannot be: the reference mesh was committed a day
+before any source was.
 
 *(Table 2 itself lists Bottle1's vertex count as 36,091 — cross-checked
 against this repo's own README mesh-statistics table, which agrees:
@@ -418,7 +420,7 @@ match isn't expected from either given the curvature-formula mismatch.
 | 2026-07-02 – 2026-07-03 | M4 | Got this fork building on macOS, then found and fixed a genuine upstream bug — `ProjectToIsoSurface()` had an infinite loop with no exit path, an unbounded quality-ratchet, and a convergence tolerance borrowed from an unrelated check. Fixed and verified against `bone`, the smallest sample model. Separately, this is also where the sibling `HexOpt` repo's own gap was first found (its public code doesn't implement the AL/L-BFGS/ReHQJ method its paper claims). |
 | 2026-08-04 | M1 | Cloned the fork here, cleaned up ~600K lines of build cruft the M4 session had accidentally committed, and ran the first Bottle1 reproduction attempt. Result: a mesh ~6x too large and a worst scaled Jacobian far below Table 2's — the size gap unexplained at the time, the quality gap eventually traced to a deliberately reduced iteration budget. |
 | 2026-08-05 | M1 | Root-caused the mesh-size gap to two separate issues — the shipped curvature thresholds didn't match the paper's stated values, and (independently) this codebase's curvature *formula* doesn't match the paper's stated formula either.<br><br>Recalibrated empirically using `bone` as a fast testbed, which fixed `bone`'s mesh size well and got Bottle1's convergence *quality* to match closely — but Bottle1's mesh size and, especially, its runtime (~27x slower than `bone` even fully calibrated) remained largely unmoved.<br><br>Spent most of the day testing *why*, testing four hypotheses for the over-refinement:<ul><li>`C_THRES` alone — tested and refuted</li><li>`H_THRES` alone — tested and refuted</li><li>octree-balancing propagation — tested and refuted</li><li>spatial dispersion of refinement candidates — real but insufficient effect</li></ul>Also traced a related finding in the sibling `HexOpt` repo: its restored optimizer code looks structurally like `HybridOctree_Hex`'s own older algorithm, not the CAD 2026 paper's claimed method, backed by a definitive date-based proof (see `hovey/HexOpt`'s README). |
-| 2026-08-17 | M1 | Switched strategy from threshold-guessing to git archaeology. Found that the repo's `/our results/bottle1.vtk`, committed by the paper's first author Tong one day before the `v1.0` tag and never touched since, reproduces Table 2's Bottle1 numbers **exactly** (36,091 verts / 30,145 elems / worst SJ 0.560000 / best SJ 1.0, via `scaled_jacobian_stats`) — strong evidence it's the actual paper output file, not just a close match.<br><br>Statically diffed source across every upstream tag (`v1.0`→`v1.1`→`v1.2`→`v1.3`→current `HEAD`) and found the 2026-08-05 calibration work had anchored `C_THRES` to `v1.2`'s values — but `v1.0`/`v1.1`'s own original constants (`C_THRES={0.15,0.3,0.6,1.2,2.4}`, `VOXEL_SIZE=9`), the closest available source snapshot in time to the reference mesh, had never been tried.<br><br>Built and ran both `v1.0` and `v1.1` against the recovered original 2024-01-11 input surface. Both got permanently stuck at the same point in the final projection stage (never reached Table 2's numbers), which reframed the investigation: not a `v1.0`-vs-`v1.1` code-version question after all, but something about specific local geometry in Bottle1's input surface that this gradient-descent projection method can't resolve regardless of version.<br><br>Along the way, corrected two initial misreadings (see Detailed log for the full trail): `c291245` (2024-01-11, used for today's runs) has an off-by-one header bug that makes `ReadRawData()` silently duplicate its last triangle, while `f3247d8` (2024-01-16) parses cleanly; and `v1.1`'s new code block turned out to be a post-convergence step, not stuck-recovery logic, so it never actually ran in either attempt — the real cause of `v1.0`/`v1.1`'s differing exploration patterns is still open. `v1.1` left running as a low-priority background check; next step is a targeted dump of the local triangle neighborhood around the stuck point. |
+| 2026-08-17 | M1 | Switched strategy from threshold-guessing to git archaeology. Found that the repo's `/our results/bottle1.vtk`, committed by the paper's first author Tong one day before the `v1.0` tag and never touched since, reproduces Table 2's Bottle1 numbers **exactly** (36,091 verts / 30,145 elems / worst SJ 0.560000 / best SJ 1.0, via `scaled_jacobian_stats`) — strong evidence it's the actual paper output file, not just a close match.<br><br>Statically diffed source across every upstream tag (`v1.0`→`v1.1`→`v1.2`→`v1.3`→current `HEAD`) and found the 2026-08-05 calibration work had anchored `C_THRES` to `v1.2`'s values — but `v1.0`/`v1.1`'s own original constants (`C_THRES={0.15,0.3,0.6,1.2,2.4}`, `VOXEL_SIZE=9`), the closest available source snapshot in time to the reference mesh, had never been tried.<br><br>Built and ran both `v1.0` and `v1.1` against the recovered original 2024-01-11 input surface. Both got permanently stuck at the same point in the final projection stage (never reached Table 2's numbers), which reframed the investigation: not a `v1.0`-vs-`v1.1` code-version question after all, but something about specific local geometry in Bottle1's input surface that this gradient-descent projection method can't resolve regardless of version.<br><br>Along the way, corrected two initial misreadings (see Detailed log for the full trail): `c291245` (2024-01-11, used for today's runs) has an off-by-one header bug that makes `ReadRawData()` silently duplicate its last triangle, while `f3247d8` (2024-01-16) parses cleanly; and `v1.1`'s new code block turned out to be a post-convergence step, not stuck-recovery logic, so it never actually ran in either attempt — the real cause of `v1.0`/`v1.1`'s differing exploration patterns is still open. `v1.1` left running as a low-priority background check; next step is a targeted dump of the local triangle neighborhood around the stuck point.<br><br>**Later the same day, both open questions closed.** Instead of dumping the triangle neighborhood, switched to measuring octree levels directly off the meshes — every model is rescaled into a fixed 100-unit cube, so a hex's edge length *is* its octree cell size and its level is just `log2(100/edge)`. That turned the whole problem from inference into measurement.<br><br>Three results followed. (1) `v1.0`'s shipped constants are the paper's constants: run unmodified on `bone` they reproduce `our results/bone.vtk` **exactly** — 10,356 / 8,619 / 0.610001 / 1.0, with byte-identical cell connectivity — so every earlier session's threshold calibration was solving a problem that did not exist. (2) Bottle1's reference mesh sits exactly on the committed input surface (max boundary deviation 0.00000), so the input was never the variable either; the one remaining variable is how deep the octree refines, and Table 2's "Refinement Level" column turns out to report exactly that — the number of active refinement tiers, verified against every Table 2 model's reference mesh. Bottle1 used **four** tiers where the public code hardcodes five, which alone accounts for the entire 3.4x oversizing: 101,688 elements → 27,750. (3) The all-day projection stalls were caused by `c291245`'s duplicated triangle — a controlled same-config comparison has `c291245` frozen forever at `smallDist=1.399` while `f3247d8` converges cleanly — so the header-correct file is the one to reproduce against, reversing this morning's choice.<br><br>Best configuration reached: 35,535 verts / 29,943 elems against 36,091 / 30,145 (−1.5% / −0.7%), with octree levels 6 and 7 — 93% of the mesh — matching to 0.5% and 0.1%. The last ~1% is not uniquely pinned by the evidence, and probably cannot be: the reference mesh predates the first committed source by a day. |
 
 ## Detailed log
 
@@ -1103,7 +1105,120 @@ worst SJ 0.570000 and best SJ 1.000000 — converged cleanly, 7.9% under Table
 2's cell count. (Worst SJ is not an independent constraint: it is simply
 whatever value the `ELEM_THRES` ratchet had reached when the run was stopped,
 which is why every "ours" row in Table 2 lands in the narrow 0.54-0.59 band
-that ratchet walks through, `0.53 + 0.01 k`.)
+that ratchet walks through, `0.53 + 0.01 k`. That run kept climbing past
+0.570 to 0.580 while still writing the same 32,970 / 27,750 mesh, so 0.560 is
+a stopping point, not a property of the mesh.)
+
+**Finding 14 — closing the last percent: restore the scale-relative
+thickness rule and use the author's own `CELL_DETECT = 0.75`.** The
+shifted ladder halves every thickness threshold relative to its tier's cell
+size, so the natural correction is to double `H_THRES` to `{32,16,8,4,2}`,
+which restores `H_THRES[i] = 2.56 x cellsize` exactly. On its own that
+overshoots (Finding 12), but combined with `CELL_DETECT = 0.75` — the value
+Tong himself used in his 2024-01-19 and 2024-01-21 commits, which narrows
+`ComputeCellValue()`'s detection box from `2 x cellsize` to `1.5 x cellsize` —
+it lands essentially on the reference. Both against `f3247d8`:
+
+| Configuration | Points | Cells | vs. target |
+|---|---|---|---|
+| **Table 2 target** | **36,091** | **30,145** | — |
+| `rl4` + `H_THRES x 2` + `CELL_DETECT = 0.75` | **35,535** | **29,943** | **−1.5% / −0.7%** |
+| `rl4` + `H_THRES[3] = 3` | 36,164 | 30,554 | +0.2% / +1.4% |
+| `rl4` (thickness array shifted with the ladder) | 32,970 | 27,750 | −8.6% / −7.9% |
+| `rl4` + raw Euclidean thickness (hypothesis, refuted) | 32,631 | 27,482 | −9.6% / −8.8% |
+
+*(That last row tested whether the pre-`v1.0` code lacked
+`GetCellValue()`'s dominant-axis scaling — `len = max(|dx|,|dy|,|dz|) x |len|`,
+flagged as an unexplained anomaly by the 2026-08-05 session. Removing it moves
+the mesh the wrong way: the factor is always in `[1/sqrt(3), 1]` and therefore
+always shrinks the measured thickness, so dropping it makes fewer triangles
+pass `len < H_THRES` and produces a slightly **smaller** mesh, not a larger
+one. Hypothesis refuted; the scaling stays. Built behind `-DRAW_THICKNESS` in
+`HybridOctree_Hex_v1.0/HexGen.cpp` for the record, off by default.)*
+
+The `CELL_DETECT = 0.75` configuration's level-by-level agreement is the real
+evidence, because it is far tighter than the totals:
+
+| Level | Reference | `rl4` + `H x 2` + `CELL_DETECT 0.75` | Agreement |
+|---|---|---|---|
+| 4 | 51 | 41 | — (0.1% of the mesh) |
+| 5 | 1,051 | 1,069 | +1.7% |
+| 6 | 10,039 | 10,093 | **+0.5%** |
+| 7 | 17,921 | 17,945 | **+0.1%** |
+| 8 (distortion artifacts) | 1,077 | 795 | — (not real cells) |
+| **Total** | **30,145** | **29,943** | **−0.7%** |
+
+Levels 6 and 7 carry 93% of the mesh and match to 0.5% and 0.1%. The whole
+remaining 202-cell total difference is the level-8 artifact count, which just
+tracks how far each mesh's projection stage had smoothed when it was sampled,
+not a difference in the octree.
+
+**Recipe that reproduces Bottle1's Table 2 row.** For the record, the full
+configuration, all of it `v1.0` source with no algorithmic change:
+
+- source: the `v1.0` tag, `sscanf_s` -> `sscanf` and `<malloc.h>` -> `<cstdlib>`
+  portability patches only
+- input: `input boundaries/bottle1_tri.raw` at `f3247d8` (2024-01-16),
+  header `14833 29664`
+- `C_THRES = {0.15, 0.3, 0.6, 1.2, 2.4}` — `v1.0`'s own, unchanged
+- `H_THRES = {32, 16, 8, 4, 2}` — `v1.0`'s own, doubled to keep
+  `H_THRES[i] = 2.56 x cellsize` under the shifted ladder
+- `CELL_DETECT = 0.75`
+- four refinement tiers at octree levels 3-6, maximum level 7 — built as
+  `-DVOXEL_SIZE_VALUE=7 -DLADDER_TOP=octreeDepth`
+- run `ProjectToIsoSurface` until `ELEM_THRES` reaches 0.56 and stop, exactly
+  as the unbounded `while (true)` loop forces a human operator to do — this
+  run was watched through 0.500001, 0.550000 and on to 0.570001 on the same
+  35,535 / 29,943 mesh, so 0.560 is simply one rung of that ladder
+
+Final state of that run, `runs/bottle1-v1.0-rl4-h2xcd75-fi/finalMesh.vtk`,
+against Table 2's Bottle1 row:
+
+| | Reproduction | Table 2 / `our results/bottle1.vtk` |
+|---|---|---|
+| Points | 35,535 | 36,091 |
+| Cells | 29,943 | 30,145 |
+| Worst SJ | 0.560 en route (sampled at 0.570001) | 0.560000 |
+| Best SJ | 1.000000 | 1.000000 |
+| Refinement level | 4 | 4 |
+
+Honest accounting of what is derived versus fitted: the four-tier ladder is
+*derived* — it is what Table 2's own "Refinement Level" column says, it is
+confirmed independently by every other model's reference mesh (Finding 10),
+and it alone accounts for the factor of 3.4. `H_THRES x 2` is *derived* from
+the scale-relative structure of the shipped arrays. `CELL_DETECT = 0.75` is
+*fitted*, in the weak sense that it was chosen from the author's own set of
+historical values because it closed the residual gap; a different
+compensation (`H_THRES[3] = 3` at `CELL_DETECT = 1`) lands equally close from
+the other side, so the last ~1% is not uniquely determined by the evidence.
+That is expected: `our results/bottle1.vtk` was committed 2024-01-11, a full
+day before *any* source was committed to the repository, so the exact code
+that produced it is not in git and small pre-`v1.0` differences cannot be
+recovered.
+
+**Where to go next.** The method is now established and cheap, so the natural
+next step is breadth rather than more depth on Bottle1:
+
+1. **Run the remaining eleven Table 2 models.** Each one's refinement level is
+   already read off its reference mesh (Finding 10), so each is a single run
+   with a known ladder setting rather than a search. Bunny (4 tiers), Dragon
+   Stand2 and Gargoyle (4 tiers, ladder one level finer — their references
+   have no level-4 cells), Head and Deformed Armadillo (5), David (6, needs
+   the sixth tier that `v1.2` left commented out). Confirming the recipe
+   transfers to models it was not tuned on is the real test of Finding 10.
+2. **Settle the last 1% properly, if at all.** The `CELL_DETECT` /
+   `H_THRES[3]` ambiguity would be resolved by any model where the two
+   compensations predict measurably different meshes — a breadth run may
+   decide it for free.
+3. **Re-examine the runtime question.** Every conclusion in the 2026-08-05
+   entry about Bottle1 being ~27x slower than `bone` was measured on octrees
+   3-6x larger than they should have been. At the correct four-tier setting
+   Bottle1's octree construction takes ~250 s rather than 2,168 s, so the
+   "218 s is unreachable with the public code" synthesis below needs
+   re-measuring before it is trusted.
+4. **The `ComputeCellValue()` performance finding still stands** — it is a
+   real missing spatial index — but its practical weight is much smaller than
+   the 2026-08-05 entry assumed.
 
 ### 2026-08-05 — Root-causing the mesh-size mismatch; redoing bone and Bottle1 (Apple M1)
 
