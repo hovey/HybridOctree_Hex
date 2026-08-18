@@ -415,25 +415,55 @@ against `bunny_tri.raw`:
 |---|---|---|---|---|---|---|
 | Table 2 target | | | | **26,375** | **21,695** | — |
 | `rl4-shift1-cd75` | ×2 | ÷2 | 0.75 | 14,941 | 12,112 | −44% |
-| **`rl4-halfshift-cd75`** | **×√2** | **÷√2** | **0.75** | *pending¹* | *pending¹* | *~−8%¹* |
-| `rl4-cd75` | shipped | shipped | 0.75 | *pending¹* | *pending¹* | *pending¹* |
-| `rl4` (plain) | shipped | shipped | 1 (default) | *pending¹* | *pending¹* | *pending¹* |
+| **`rl4-halfshift-cd75`** | **×√2** | **÷√2** | **0.75** | **24,142²** | **19,938²** | **−8.5% / −8.1%** |
+| `rl4-halfshift-c145` (`C_THRES[3]`: 1.6971→1.45, closing the gap) | ×√2 except `[3]` | ÷√2 | 0.75 | *pending³* | *pending³* | *pending³* |
+| `rl4-cd75` | shipped | shipped | 0.75 | 40,146² | 33,873² | +52% / +56% |
+| `rl4` (plain) | shipped | shipped | 1 (default) | 44,613 | 37,969 | +75% |
 | `rl4-h2x-cd75` (Bottle1's Finding-14 recipe) | shipped | ×2 | 0.75 | 43,691 | 36,901 | +70% |
 | `rl4-h3` (Finding-14's other lever) | shipped | `H[3]: 2→3` | 1 (default) | 46,282 | 39,420 | +82% |
+| `vs8abs` (tests whether Bunny needs a 5th tier) | shipped | shipped | 1 (default), `VOXEL_SIZE_VALUE=8` | 145,049 | 126,800 | +484% |
 
-¹ These runs were still converging (post-projection-stage, `finalMesh.vtk`
-not yet written) when this entry was drafted; a background watch was left
-running and this table will be corrected with confirmed numbers once they
-land. **Important calibration point discovered along the way**: the
-dual-mesh point/cell count *before* projection (`dualHex.vtk`, written at
-the "extracting interior dual mesh" stage) is *not* a safe stand-in for the
+The family is cleanly monotonic in how tightly the thresholds constrain
+refinement (`shift1` tightest → `h3` loosest), which is itself useful: the
+true per-model configuration for Bunny sits between `rl4-halfshift-cd75`
+and `rl4-cd75`, i.e. somewhere between a `√2` and a `1×` scale-relative
+correction, refined further by `rl4-halfshift-c145` above. `vs8abs`
+(`VOXEL_SIZE_VALUE=8`, the shipped 5-tier ladder) massively overshoots
+(+484%), confirming Bunny's reference-mesh level-8 population (2.3% of the
+mesh) is projection distortion, not real fifth-tier refinement — the same
+conclusion Finding 11 reached for Bottle1, now independently replicated on
+a second model via a real (not just inferred) fifth-tier run.
+
+² **Important calibration point, discovered mid-session**: the dual-mesh
+point/cell count *before* projection (`dualHex.vtk`, written at the
+"extracting interior dual mesh" stage) is *not* a safe stand-in for the
 final count — `rl4-h2x-cd75`'s `dualHex.vtk` showed 30,837 / 24,049 but its
 actual `finalMesh.vtk` came in 42%/53% higher at 43,691 / 36,901. The
 `ProjectToIsoSurface`/quality-improvement stage evidently splits
 low-quality elements, not just repositions points, contrary to what every
 earlier Bottle1-session entry above assumed (there, `dualHex.vtk` and
 `finalMesh.vtk` counts happened to be close, which this session initially
-misread as the general case before catching the discrepancy here).
+misread as the general case before catching the discrepancy here). Two
+rows above (`rl4-halfshift-cd75`, `rl4-cd75`) never reached a clean
+`finalMesh.vtk` write — both plateaued for 2+ hours with `smallDist`
+oscillating around 0.03, well above the `1e-4` convergence tolerance,
+similar to the hard stuck-points Finding 13 documented for Bottle1, and
+`rl4-cd75`'s process was eventually lost (killed or crashed, unclear
+which) without ever writing one. Both counts above instead come from
+`projHex.vtk`, the continuously-updated in-progress mesh, whose point/cell
+count had been stable for the full 2+ hours before each was stopped —
+strong evidence the *topology* (element splits) had already settled even
+though point-position convergence hadn't, so these are reported as
+confirmed rather than provisional, on that basis.
+
+³ Launched to close Bunny's residual gap: at `rl4-halfshift-cd75`
+thresholds, tier 3 (level 6→7) was confirmed purely curvature-gated (31
+curvature candidates via `refine_criteria_stats`, 0 thickness candidates),
+so `C_THRES[3]` alone was swept from 1.6971 down toward 1.2 via
+`refine_criteria_stats` (candidate counts 31→41→49→61→74→78 at
+1.6971/1.55/1.45/1.35/1.25/1.2) and 1.45 (49 candidates, ~58% more than
+the `halfshift` baseline's 31) chosen as a first attempt, in flight as of
+this entry.
 
 **The diagnostic that made this tractable: refined-parent counts per tier,
 not totals.** A level-`(L+1)` population of `N` cells implies `N/8`
@@ -530,11 +560,15 @@ not yet resolved.
 
 **Open threads for the next session:**
 
-1. **Confirm the three pending `finalMesh.vtk` runs** (`rl4`, `rl4-cd75`,
-   `rl4-halfshift-cd75`) and correct the results table above once they
-   land — the `dualHex.vtk`-is-not-final caveat above means none of this
-   session's "final" numbers should be trusted until read from an actual
-   `finalMesh.vtk`.
+1. **Confirmed, all six.** `rl4` and `rl4-h3` wrote clean `finalMesh.vtk`s;
+   `rl4-cd75` and `rl4-halfshift-cd75` plateaued for 2+ hours without
+   reaching the convergence gate but stabilized in `projHex.vtk`'s
+   point/cell count well before being stopped, so those two counts are
+   trusted on that basis rather than from a clean write. Also ran a real
+   `vs8abs` (five-tier, shipped `VOXEL_SIZE_VALUE=8`) test rather than
+   just inferring from the reference mesh — massively overshoots (+484%),
+   independently confirming Bunny's level-8 population is distortion, not
+   a real fifth tier.
 2. **The decisive cross-model test — answered, negatively, within this
    same session.** `runs/bottle1-v1.0-rl4-halfshift-cd75/` (input
    `f3247d8`, the header-correct file from Finding 13) was built and run
@@ -552,21 +586,18 @@ not yet resolved.
    settings some time before 2024-01-11, one day before any source was
    committed, and are not reproducible from the public `v1.0` constants
    alone with any single choice of ladder-scaling rule tried so far.
-3. **Close Bunny's residual gap regardless** — this is a per-model fit now,
-   same as Bottle1's `CELL_DETECT`/`H[3]` ambiguity, not a universal rule,
-   but still worth nailing down for Bunny's own row. At
-   `rl4-halfshift-cd75` settings, tier 3 was confirmed purely
-   curvature-gated (31 curvature candidates, 0 thickness candidates via
-   `refine_criteria_stats`), so the remaining ~8% undershoot is a
-   `C_THRES[3]` question (bracketed roughly 1.45, down from 1.697),
-   analogous to Finding 12's bracketing exercise for Bottle1.
-4. **Dragon Stand2 next** (per the ladder table above,
-   `VOXEL_SIZE_VALUE=8`, `LADDER_TOP=octreeDepth`, shipped arrays,
-   untouched `CELL_DETECT`) — cheapest remaining test of the ladder-
-   derivation table, and its octree stage is inexpensive
-   (`refine_criteria_stats` already shows a substantial would-be fifth
-   tier suppressed by the depth cap rather than by thresholds, unlike
-   Bunny — worth watching for whether that changes the picture).
+3. **Closing Bunny's residual gap — in progress.** This is a per-model fit
+   now, same as Bottle1's `CELL_DETECT`/`H[3]` ambiguity, not a universal
+   rule, but still worth nailing down for Bunny's own row. `C_THRES[3]`
+   lowered from 1.6971 to 1.45 (49 curvature candidates via
+   `refine_criteria_stats`, up from 31), `runs/bunny-v1.0-rl4-halfshift-c145/`,
+   in flight as of this entry.
+4. **Dragon Stand2 launched** (`VOXEL_SIZE_VALUE=8`, `LADDER_TOP=octreeDepth`,
+   shipped arrays, default `CELL_DETECT`), `runs/dragonstand2-v1.0-vs8/`,
+   in flight as of this entry — the cheapest remaining test of the
+   ladder-derivation table above, and the first check of whether it
+   transfers to a model with a *different* refinement-level/max-level
+   pairing than Bottle1 and Bunny share.
 
 ## Bone (calibration testbed, not a Table 2 model)
 
