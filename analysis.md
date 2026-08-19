@@ -561,10 +561,37 @@ present" read would have misclassified level 9 as a real sixth tier; the
 relative-magnitude test (is the deepest population a small fraction with
 a sharp drop, or a smooth continuation of the level above) is what
 resolves it correctly here — the same test that resolves David's
-sixth-tier question below, and by this point checked against five models
-(`bone`, Bottle1, Bunny, Dragon Stand2, David) without a single
-miscall — worth trusting as reliable rather than treating each new
-model's deepest-level population as an open question to re-litigate.
+sixth-tier question below.
+
+**A methodological caveat worth stating precisely, not glossing over.**
+This single-reference-mesh "small fraction + sharp drop" test is weaker
+than Finding 11's original distortion-tail evidence for Bottle1, which
+compared *two different runs* — one whose octree was structurally
+incapable of reaching the deeper level at all — and found both showed
+essentially the same small population there, proving it was a
+projection-stage measurement artifact (a squashed shallower hex, not a
+real deeper cell) rather than genuine refinement. Everything checked
+today (`bone`, David, and the seven additional models measured below)
+used only the weaker single-mesh version, since it doesn't require a
+second, deliberately-wrong run to compare against. The two tests may not
+even be probing the same underlying phenomenon: Finding 11's mechanism
+(projection smoothing squashing a shallower hex until it measures as
+deeper) is one way a small deepest-level population can arise, but a
+genuinely-sparse level from ordinary 2:1 octree balance propagation — a
+handful of boundary cells needing one extra level to satisfy the
+constraint — would produce the same small-fraction-with-a-sharp-drop
+signature without being any kind of artifact at all. For the practical
+purpose this table serves (what `VOXEL_SIZE_VALUE`/`LADDER_TOP` should a
+model use), the distinction doesn't matter — either mechanism means that
+level doesn't need its own explicit tier, and `bone`'s case settles it
+independently of which explanation is right: its shipped 5-tier
+configuration reproduces `our results/bone.vtk` byte-for-byte, level-9
+population included, so whatever produces those 51 cells is already
+present in the *correct* configuration, not evidence of a missing sixth
+tier. But readers relying on this table for anything beyond ladder-depth
+selection should know the two tests differ in strength, and that this
+session ran the weaker one seven more times below without re-running
+Finding 11's stronger comparative version on any of them.
 
 **David's sixth-tier question, reconciled** (checked directly with
 `level_histogram.py`, not reasoned about abstractly): `david.vtk`'s full
@@ -582,7 +609,50 @@ to reach it. What looked like tension was an artifact of stating the
 distortion-tail heuristic too loosely ("any small deepest-level
 population is an artifact") rather than checking whether that population
 is actually small relative to its neighbors, which is the test that
-matters and the one every other model in this table passes cleanly.
+matters.
+
+**The ladder-derivation table's predictions checked against all seven
+remaining models' own reference meshes — every one matches, at zero
+compute cost.** `level_histogram.py` run directly against each of
+Gargoyle, Head, Thai Statue, Lion Recon, Red Circular Box, Oil Pump, and
+Deformed Armadillo's `our results/*.vtk`, applying the same
+relative-magnitude test used above:
+
+| Model | Level histogram (%, by level) | Deepest real level | Drop ratio at the tail | Predicted `VOXEL_SIZE_VALUE` | Match? |
+|---|---|---|---|---|---|
+| Gargoyle | 5:0.16, 6:7.39, **7:65.29**, 8:25.62, *9:1.54* | 8 | 16.6× | 8 | ✓ |
+| Head | 4:0.43, 5:9.19, 6:25.72, **7:49.92**, 8:14.29, *9:0.44* | 8 | 32.5× | 8 | ✓ |
+| Thai Statue | 5:0.25, 6:14.83, **7:49.43**, 8:33.34, *9:2.15* | 8 | 15.5× | 8 | ✓ |
+| Lion Recon | 5:0.04, 6:4.24, 7:40.04, **8:52.72**, *9:2.96* | 8 | 17.8× | 8 | ✓ |
+| Red Circular Box | 4:0.07, 5:2.19, 6:17.12, **7:79.51**, *8:1.10* | 7 | 72.3× | 7 | ✓ |
+| Oil Pump | 5:0.77, 6:9.91, 7:28.02, **8:54.00**, 9:7.24, *10:0.07* | 9 | 103×¹ | 9 | ✓ |
+| Deformed Armadillo | 4:0.04, 5:6.16, 6:22.35, 7:26.01, **8:43.16**, *9:2.28* | 8 | 18.9× | 8 | ✓ |
+
+*(Bold = the largest band; italic = the identified distortion tail.)*
+
+¹ Oil Pump is the one borderline case: level 9 (7.24%) is a smaller,
+7.5× drop from level 8 rather than the 15-100× drops seen everywhere
+else, which is a real tier's signature, not a tail's — level 10 (0.07%,
+a further 103× drop from level 9) is unambiguously the tail instead. This
+is exactly what the ladder-derivation table already predicted (Oil Pump
+needs the stock `v1.0` ladder, `VOXEL_SIZE_VALUE=9`,
+`LADDER_TOP=octreeDepth-1`, the same setting `bone` uses) — a case where
+the reference mesh's own shape, not just the table lookup, argues for
+that reading independently.
+
+Combined with Bottle1 (Finding 10/11), Bunny, Dragon Stand2, and Ramses
+(this session, via real runs), every ladder-position prediction in the
+table above now has direct reference-mesh support — eleven of Table 2's
+twelve models (David is the twelfth, resolved separately above as
+needing its own sixth tier). None of this required running the pipeline;
+it's a `level_histogram.py` call against an existing file for each
+model, seconds of compute total. What's still unvalidated by an actual
+run is *only* the eight models never actually built and run this
+session (Gargoyle, Head, Thai Statue, Lion Recon, Red Circular Box, Oil
+Pump, Deformed Armadillo, David) — the ladder position is now
+well-supported for all of them, but each one's `C_THRES`/`H_THRES`/
+`CELL_DETECT` still needs its own fit, exactly as Bottle1, Bunny, Dragon
+Stand2, and Ramses did.
 
 **Best Bunny reproduction reached.** `C_THRES[3]` lowered from
 `rl4-halfshift-cd75`'s 1.6971 to 1.45 (`runs/bunny-v1.0-rl4-halfshift-c145/`,
