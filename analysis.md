@@ -673,7 +673,7 @@ operator chose to stop each one).
 | `bunny-v1.0-rl4-h3` | 1.40 s | 471.7 s | 58.2 s | 91.6 s | 451 s (~7.5 min) | 622.9 s |
 | `bunny-v1.0-vs8abs` (5-tier control) | 1.44 s | 4,083.1 s (~68.1 min) | 531.1 s | 405.7 s | 2,498 s (~41.6 min) | 5,021.3 s |
 | `dragonstand2-v1.0-vs8` | 10.2 s | 3,893.2 s (~64.9 min) | 587.2 s | 806.0 s | 1,149 s (~19.2 min) | 5,296.6 s |
-| `ramses-v1.0-vs8` | 2.0 s | 11,420.9 s (~190.3 min) | *in progress* | — | — | — |
+| `ramses-v1.0-vs8` | 2.0 s | 11,420.9 s (~190.3 min) | 1,435.9 s (~23.9 min) | 1,029.6 s (~17.2 min) | *in progress* | 12,889.4 s (~214.8 min) |
 
 Two patterns worth noting. **Octree construction time tracks threshold
 tightness almost exactly**, within each model — Bunny's own configs span
@@ -683,12 +683,21 @@ a 7.4x range (58.0 s to 471.7 s) purely from how permissive `C_THRES`/
 same ordering as the mesh-size results table above, which makes sense
 since a looser threshold means more octree cells get flagged for
 refinement, which is directly what this stage computes. **`vs8abs` and
-`dragonstand2-v1.0-vs8` are the two outliers, both around an hour of
-octree time alone**, and for the same underlying reason: both build a
-substantially deeper/denser octree than any Bunny-`rl4` config, one from
-testing the wrong (too-deep) ladder rung and one from Dragon Stand2's own
-scale and detail at its *correct* rung — a reminder that "cheap to test
-via `refine_criteria_stats` first" (the recipe item in the Synthesis
+`dragonstand2-v1.0-vs8` are outliers at around an hour of octree time
+alone, and `ramses-v1.0-vs8` is a far bigger one at ~3.2 hours** — all
+three for the same underlying reason: each builds a substantially
+deeper/denser octree than any Bunny-`rl4` config, and the pre-projection
+`dualHex.vtk` size explains why Ramses is the worst of the three by a
+wide margin. Its shipped-threshold octree came in at **191,606 / 163,949**
+pre-projection against a target of only 44,790 / 37,993 — a **4.3x**
+overshoot, far worse than Dragon Stand2's ~1.3x at the same shipped-
+threshold, correct-ladder-rung baseline. So Ramses isn't just slow because
+it's at the same expensive ladder rung as Dragon Stand2 — the shipped
+thresholds are *more* mismatched for Ramses specifically than for any
+other model tried this session, which is itself a data point for the
+per-model-fitting story: even models sharing a ladder rung don't share a
+threshold-mismatch magnitude. A reminder that "cheap to test via
+`refine_criteria_stats` first" (the recipe item in the Synthesis
 above) matters more, not less, as a model's octree gets deeper, since the
 full-run cost of a wrong guess grows with it.
 
