@@ -558,6 +558,52 @@ distortion-tail heuristic as *also* an artifact, which conflicts with
 Finding 10's own "David reaches level 9" reading — an open reconciliation,
 not yet resolved.
 
+**Best Bunny reproduction reached.** `C_THRES[3]` lowered from
+`rl4-halfshift-cd75`'s 1.6971 to 1.45 (`runs/bunny-v1.0-rl4-halfshift-c145/`,
+otherwise identical: `C_THRES = {0.2121, 0.4243, 0.8485, 1.45, 3.3941}`,
+`H_THRES = {11.3137, 5.6569, 2.8284, 1.4142, 0.7071}`, `CELL_DETECT = 0.75`,
+four-tier `rl4` ladder) converged cleanly — `finalMesh.vtk` written, mesh
+topology stable in `projHex.vtk` well past that point:
+
+| | Reproduction | Table 2 target |
+|---|---|---|
+| Points | 27,175 | 26,375 |
+| Cells | 22,525 | 21,695 |
+| vs. target | **+3.0% / +3.8%** | — |
+| Refinement level | 4 | 4 |
+
+This is closer than Bottle1's own best reproduction (−1.5%/−0.7%, but in
+the opposite direction — Bunny overshoots slightly where Bottle1
+undershot slightly), reached by a symmetric method: start from the other
+model's recipe, recognize it doesn't transfer, find the scale-relative
+correction that brackets the target, then nudge the one tier that's
+purely curvature-gated. `C_THRES[3]` between 1.45 and 1.6971 would
+presumably narrow the remaining ~3% further, but wasn't pursued past this
+point — Bottle1's own experience (Finding 14) is that the last few percent
+sits in a fitted, not derived, regime once the ladder and gross threshold
+scale are right, so further digits likely trade one arbitrary choice for
+another rather than revealing anything new. Worst SJ at time of writing is
+still an early ratchet value (0.01, the initial gate) — being left running
+to reach a value comparable to Table 2's reported 0.570, which (per every
+other model's own results table above) is a stopping point on the
+`ELEM_THRES` ratchet, not an independent property of the mesh.
+
+**Dragon Stand2 — first check of whether any of this transfers to a model
+with a different max level, and it doesn't, the same way Bunny didn't
+transfer from Bottle1.** `runs/dragonstand2-v1.0-vs8/`
+(`VOXEL_SIZE_VALUE=8`, `LADDER_TOP=octreeDepth`, shipped `C_THRES`/
+`H_THRES`, default `CELL_DETECT=1`, per the ladder-derivation table above)
+converged to **117,793 / 98,666** against Table 2's **62,576 / 50,853** —
+an **88% / 94% overshoot**, the same order of magnitude and direction as
+Bunny's shipped-threshold attempts (+70-82%) despite Dragon Stand2 sitting
+at a different rung of the ladder (`VOXEL_SIZE_VALUE=8` vs. Bunny/Bottle1's
+7). The ladder-position prediction held — this wasn't a five-tier-style
+catastrophic failure, "only" roughly double — but the threshold values
+once again needed their own fit, a third independent confirmation of the
+synthesis above. Not pursued further this session (stopped once the
+answer was clear, to leave CPU for closing out Bunny); a natural next step
+whenever this resumes.
+
 **Open threads for the next session:**
 
 1. **Confirmed, all six.** `rl4` and `rl4-h3` wrote clean `finalMesh.vtk`s;
@@ -586,18 +632,21 @@ not yet resolved.
    settings some time before 2024-01-11, one day before any source was
    committed, and are not reproducible from the public `v1.0` constants
    alone with any single choice of ladder-scaling rule tried so far.
-3. **Closing Bunny's residual gap — in progress.** This is a per-model fit
-   now, same as Bottle1's `CELL_DETECT`/`H[3]` ambiguity, not a universal
-   rule, but still worth nailing down for Bunny's own row. `C_THRES[3]`
-   lowered from 1.6971 to 1.45 (49 curvature candidates via
-   `refine_criteria_stats`, up from 31), `runs/bunny-v1.0-rl4-halfshift-c145/`,
-   in flight as of this entry.
-4. **Dragon Stand2 launched** (`VOXEL_SIZE_VALUE=8`, `LADDER_TOP=octreeDepth`,
-   shipped arrays, default `CELL_DETECT`), `runs/dragonstand2-v1.0-vs8/`,
-   in flight as of this entry — the cheapest remaining test of the
-   ladder-derivation table above, and the first check of whether it
-   transfers to a model with a *different* refinement-level/max-level
-   pairing than Bottle1 and Bunny share.
+3. **Bunny's residual gap — closed to +3.0%/+3.8%.** See "Best Bunny
+   reproduction reached" above.
+4. **Dragon Stand2 — run, and it confirms the per-model-thresholds
+   conclusion a third time.** See above; not yet fitted the way Bottle1
+   and Bunny were (stopped once the headline overshoot was clear), a
+   natural next step whenever this resumes. Its dramatically slower
+   pipeline (65 min octree construction alone, vs. Bottle1/Bunny's few
+   hundred seconds) is itself worth a closer look before assuming its
+   `C_THRES`/`H_THRES` fitting will be as cheap as the other two models'
+   was via `refine_criteria_stats`.
+5. Table 2's remaining nine models, per the ladder-derivation table above —
+   the ladder-position prediction has now held on three consecutive
+   models (Bottle1, Bunny, Dragon Stand2), so treat it as reliable and
+   spend the effort on the threshold fit instead, which has not
+   transferred cleanly on any pair tried yet.
 
 ## Bone (calibration testbed, not a Table 2 model)
 
