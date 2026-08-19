@@ -79,12 +79,27 @@ Worst SJ / Best SJ / Refinement Level / Time), in the paper's own Table 2
 order. Time (min) is Time (s) ÷ 60, added here — not in the original
 table — for readability on the slower rows.
 
+*: From this present study, the best match to the Tong 2024 published results.
+
 ### 1. Bottle1 (Genus-1)
 
 | Method | Vertices | Elements | Worst SJ | Best SJ | Refinement Level | Time (s) | Time (min) |
 |---|---|---|---|---|---|---|---|
 | [Gao 2019](https://cims.nyu.edu/gcl/papers/2019-OctreeMeshing.pdf) | 39,326 | 33,635 | 0.181 | 0.999 | 4 | 8,175 | 136.3 |
 | **[Tong 2024](https://arxiv.org/pdf/2401.05984)** | **36,091** | **30,145** | **0.560** | **1.0** | **4** | **218** | **3.6** |
+| * | 35,535 | 29,943 | 0.570 | 1.0 | 4 | ~1,561¹ | ~26.0¹ |
+
+¹ Approximate: summed internal stage timers (read + octree + dualization +
+buffer clearing, 401.2 s) plus the wall-clock gap from buffer clearing to
+this run's `finalMesh.vtk` write (file mtimes, 1,160 s) — not a clean
+internal timer read the way Tong 2024's own 218 s presumably is, and not
+directly comparable to it for that reason (see the Bottle1 section below,
+and its own pipeline-timings table, for the full breakdown and why this
+recipe's timing hasn't been the focus of this study). Config: `v1.0`
+source, input `f3247d8` (2024-01-16), `C_THRES` unchanged,
+`H_THRES = {32,16,8,4,2}`, `CELL_DETECT = 0.75`, four-tier `rl4` ladder
+(`VOXEL_SIZE_VALUE=7`, `LADDER_TOP=octreeDepth`) — see Finding 14 below for
+the full recipe and derivation.
 
 ### 2. Bunny (Genus-0)
 
