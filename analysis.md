@@ -555,12 +555,26 @@ model this repo reproduces byte-exactly. Caveat: the "deepest real level"
 read is itself ambiguous at low population counts (`bone`'s reference has
 only 51 cells at level 9 — if judged by a naive "any cells present"
 threshold rather than a distortion-tail read, it would misclassify as
-level 8) — this is the same open question as Bottle1's/Bunny's level-8
-distortion tails, and David's claimed sixth tier (Finding 9's 1,997 cells
-at level 10, 0.7% of the mesh, a 29× drop from level 9) reads by this same
-distortion-tail heuristic as *also* an artifact, which conflicts with
-Finding 10's own "David reaches level 9" reading — an open reconciliation,
-not yet resolved.
+level 8) — this is the same kind of question as Bottle1's/Bunny's level-8
+distortion tails.
+
+**David's sixth-tier question, reconciled** (checked directly with
+`level_histogram.py`, not reasoned about abstractly): `david.vtk`'s full
+distribution is level 4: 0.02%, 5: 1.74%, 6: 9.52%, 7: 26.14%, 8: 41.11%,
+**9: 20.77%**, 10: 0.71%. Level 9 is not a thin tail by any reading of the
+heuristic used elsewhere in this table — it's the *second-largest* band in
+the mesh, a smooth continuation of the level 4→8 climb, not a sudden drop.
+Level 10 (0.71%, a 29× drop from level 9) is the actual distortion tail,
+matching the same small-fraction signature seen on every other model's
+deepest population. So Finding 9 and Finding 10 were never really in
+conflict — David does need a genuine sixth tier (levels 4-9), Table 2's
+"Refinement Level 6" is literal, and the commented-out
+`//if (level == 9) {// 5` block in `v1.2`/`v1.3` is exactly what's needed
+to reach it. What looked like tension was an artifact of stating the
+distortion-tail heuristic too loosely ("any small deepest-level
+population is an artifact") rather than checking whether that population
+is actually small relative to its neighbors, which is the test that
+matters and the one every other model in this table passes cleanly.
 
 **Best Bunny reproduction reached.** `C_THRES[3]` lowered from
 `rl4-halfshift-cd75`'s 1.6971 to 1.45 (`runs/bunny-v1.0-rl4-halfshift-c145/`,
