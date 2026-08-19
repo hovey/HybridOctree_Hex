@@ -673,7 +673,7 @@ operator chose to stop each one).
 | `bunny-v1.0-rl4-h3` | 1.40 s | 471.7 s | 58.2 s | 91.6 s | 451 s (~7.5 min) | 622.9 s |
 | `bunny-v1.0-vs8abs` (5-tier control) | 1.44 s | 4,083.1 s (~68.1 min) | 531.1 s | 405.7 s | 2,498 s (~41.6 min) | 5,021.3 s |
 | `dragonstand2-v1.0-vs8` | 10.2 s | 3,893.2 s (~64.9 min) | 587.2 s | 806.0 s | 1,149 s (~19.2 min) | 5,296.6 s |
-| `ramses-v1.0-vs8` | 2.0 s | *in progress* | — | — | — | — |
+| `ramses-v1.0-vs8` | 2.0 s | 11,420.9 s (~190.3 min) | *in progress* | — | — | — |
 
 Two patterns worth noting. **Octree construction time tracks threshold
 tightness almost exactly**, within each model — Bunny's own configs span
