@@ -692,12 +692,15 @@ stable rather than transient. This is the same stuck-point signature
 Finding 13 first identified on Bottle1 (there, root-caused to a genuine
 input-file bug) and that two of this session's other six Bunny configs
 (`rl4-cd75`, `rl4-halfshift-cd75`) also hit — but `bunny_tri.raw` has no
-known defect, so on its own this occurrence doesn't point to a cause. Four independent stuck-point
-observations across two models is enough to say the phenomenon is common
-for this gradient-descent projection method generally, not a
-`bunny_tri.raw`- or Bottle1-specific artifact — worth investigating on its
-own terms rather than continuing to treat each occurrence as one-off. Per
-the mesh-size result above, this doesn't affect Bunny's headline
+known defect, so on its own this occurrence doesn't point to a cause. Four
+stuck-point/stall observations across two models at the time of writing —
+later extended to eight across four models once Dragon Stand2's own five
+runs (all of which stalled at the initial worst-SJ gate, see below) are
+counted — is enough to say the phenomenon is common for this
+gradient-descent projection method generally, not a `bunny_tri.raw`- or
+Bottle1-specific artifact — worth investigating on its own terms rather
+than continuing to treat each occurrence as one-off. Per the mesh-size
+result above, this doesn't affect Bunny's headline
 reproduction — as the Bottle1 section already established, worst SJ is a
 stopping point on the ratchet, not an independent property of the mesh,
 and the mesh itself (size, topology) was unaffected by never reaching a
@@ -717,6 +720,122 @@ catastrophic failure, "only" roughly double — but the threshold values
 once again needed their own fit, a third independent confirmation of the
 synthesis above.
 
+**Dragon Stand2 — fitted to −0.43%/−0.49%, the closest reproduction of
+any Table 2 model so far.** A background Opus agent took this on, in
+parallel with the Ramses baseline run below, and along the way found
+something that changes how every future model in this table should be
+fitted — see Finding 15 immediately below for the full mechanism. Final
+recipe: `VOXEL_SIZE_VALUE=8`, `LADDER_TOP=octreeDepth` (unchanged from
+the baseline), `C_THRES` = shipped `×√2` (the same "half-level" scale
+correction that helped Bunny), `H_THRES` = shipped `÷√2` at tiers 0, 3,
+4, but tiers 1 and 2 tightened further to `4.45` (from `5.657`) and `2.6`
+(from `2.828`), `CELL_DETECT = 0.75`. Reached in six full runs (the first
+four working out the coupling rule itself, the last two a mechanical
+per-tier fit once the rule was known):
+
+| | Reproduction | Table 2 target |
+|---|---|---|
+| Points | 62,307 | 62,576 |
+| Cells | 50,603 | 50,853 |
+| vs. target | **−0.43% / −0.49%** | — |
+| Refinement level | 4 | 4 |
+
+Per-tier refined-parent counts: 1,855.8 / 2,967.3 / 1,898.7 against the
+reference's 1,833.1 / 2,981.9 / 1,952.0 — **+1.2% / −0.5% / −2.7%**, every
+tier inside 3%, against the shipped baseline's +25% / +91% / +182%. Worst
+SJ stalled at the initial 0.01 gate across every run that reached
+projection (the same phenomenon documented for Bunny, now an eighth
+occurrence across four models) — no effect on mesh size or topology.
+Independently re-verified with `scaled_jacobian_stats` and
+`level_histogram.py --parents` against the agent's own numbers before
+writing this section. Full blow-by-blow (all six runs, the two dead ends,
+the segfault below) is in `dragonstand2-scratch.md` at the repo root, not
+folded in here in full — this is the load-bearing summary.
+
+### Finding 15 — the five refinement tiers are not independent knobs, and the asymmetry is exact, not approximate
+
+The single most useful discovery of the whole Dragon Stand2 fit, and it
+changes the recommended fitting procedure for every model after this one.
+`ComputeCellValue()` (`HexGen.cpp:1017`) tests a cell's own tier gate only
+as a *fallback*: for any cell above the deepest level, it first checks
+all eight children and marks the cell `intersect = true` if **any** child
+intersects, only falling through to the cell's own `C_THRES`/`H_THRES`
+box test when none do. Two consequences follow, both confirmed
+experimentally, not just read off the source:
+
+- **Tightening tier `t`'s threshold affects tier `t` and nothing
+  shallower.** A cell that now fails its own (tightened) test provably
+  had no refining children either — if it had, the child check would
+  already have marked it `intersect` before its own test ever ran. So
+  tightening can only delete cells that were already leaves at that
+  level, never anything shallower. Verified exactly: tightening
+  `H_THRES[1]` alone (run 3 vs. run 1) left tiers 2 and 3's octree parent
+  counts bit-identical — not approximately equal, identical to the
+  integer — while tier 1 moved by −4.5%.
+- **Loosening tier `t`'s threshold propagates upward to every shallower
+  tier**, because a newly-intersecting deep cell now marks its parent
+  (and grandparent, ...) `intersect = true` too, through the same
+  child-check path. Measured directly: loosening tier 3 by +22%
+  (candidate count) pulled tier 2's octree parent count up +6.8% and
+  tier 1 up slightly, with *tier 2's own threshold completely
+  unchanged*. A first attempt that read tier 3 as "9% too tight" in
+  isolation and loosened it accordingly went the wrong way entirely —
+  the propagated increase at tiers 1-2 more than cancelled the intended
+  tier-1 tightening it was paired with, and the run had to be killed at
+  the octree stage as a known regression.
+
+**This makes per-tier fitting mechanical instead of a search.** Read the
+reference mesh's refined-parent counts per tier
+(`level_histogram.py --parents`), then tighten each tier's own `C_THRES`/
+`H_THRES` — working in any order, since tightening never pollutes another
+tier — until each tier's parent count matches, using `refine_criteria_stats`
+to sweep threshold values cheaply before committing to full runs. Never
+loosen a tier relative to a baseline that already overshoots everywhere,
+since a loosening's effect on shallower tiers is real but not confidently
+predictable in advance (the failed first attempt didn't get the direction
+of the *net* effect wrong, only its magnitude, but that was enough to
+invert the outcome). This retroactively explains why Bunny's own
+`C_THRES[3]` fit (a single-tier loosening) worked cleanly on the first
+try in the Bunny section above: tier 3 was Bunny's *deepest* tier, with
+nothing below it to propagate from — loosening the deepest tier is always
+safe, by the same logic that makes tightening any tier always safe. The
+risk is specific to loosening a tier that has tiers beneath it, which
+neither Bottle1's nor Bunny's fits ever needed to do.
+
+A second, smaller finding from the same session: `refine_criteria_stats`
+candidate counts map to refined-parent counts by an approximate power
+law, `conditional_parent_ratio ≈ candidate_count_ratio^α` — but α differs
+between the octree stage and the final mesh (≈0.19–0.28 vs. ≈0.40–0.53
+here) and between models (Bunny's α ≈ 0.37/0.57/0.37, Dragon Stand2's ≈
+0.40/0.46/0.53), so it's a local calibration useful for guiding one step
+of a search on a model with at least one full run already done, not a
+transferable constant to predict a config's outcome from
+`refine_criteria_stats` alone with zero full runs. Related: `octree.vtk`
+(written right after octree construction, hours before a full run
+finishes) is an excellent *projection-free* early read on each tier's
+relative shape, but the octree→final-mesh "survival ratio" — how many
+octree-stage parents survive into the final mesh's parent count — drifts
+with configuration (Dragon Stand2's projection inflation factor was
+`×1.580` for the shipped run and `×1.726` for the first fitted attempt),
+so using `octree.vtk` alone to predict a config's *absolute* final size
+ran consistently ~10% low here. Once two full runs of the same model
+exist, fitting `total_cells = a + b·(sum of per-tier parents)` linearly
+across just those two points predicted both a third run's outcome and —
+more tellingly — the reference mesh's own total from its own parent sum,
+to within 0.5%.
+
+**A new failure mode, distinct from the convergence stalls.** One
+configuration (`H_THRES[2] = 2.5`, between the two that bracketed the
+final answer) crashed with `EXC_BAD_ACCESS` inside
+`hexGen::ProjectToIsoSurface`, a wild-pointer segfault in `__bzero`
+(crash report preserved in the agent's environment,
+`HexGen-2026-08-18-232512.ips`), not the usual infinite-loop-needing-a-
+human-to-stop-it behavior documented elsewhere in this file. Reproducible
+for that exact configuration and mesh; not investigated further (worked
+around by moving to a neighboring threshold value instead) — worth a
+closer look if it recurs, since every other run this session either
+converged or stalled cleanly rather than crashing.
+
 **Ramses — the worst shipped-threshold mismatch found this session.**
 `runs/ramses-v1.0-vs8/` (`VOXEL_SIZE_VALUE=8`, `LADDER_TOP=octreeDepth`,
 shipped `C_THRES`/`H_THRES`, default `CELL_DETECT=1` — same ladder rung
@@ -731,11 +850,14 @@ models sharing the same ladder rung and the same shipped-threshold
 baseline (Dragon Stand2: +88-94%, Ramses: +448-473%) landing five times
 further apart than either is from its own target is strong further
 evidence against any single per-rung correction factor — the fitting
-really is per-model, not even per-ladder-rung. Not pursued to a fit this
-session (its ~3.6-hour pipeline, by far the slowest of any model run,
-made even one exploratory full run an expensive commitment; the sharper
-`refine_criteria_stats`-first approach used for Bunny is the obvious next
-step before attempting a second Ramses run).
+really is per-model, not even per-ladder-rung. Not pursued to a fit yet —
+its ~3.6-hour pipeline, by far the slowest of any model run, made even
+one exploratory full run an expensive commitment, but Finding 15 (Dragon
+Stand2's session, below) turns that from a search into a mechanical
+per-tier match against `refine_criteria_stats` and the reference's own
+refined-parent counts, which should make Ramses considerably cheaper to
+fit than Dragon Stand2 was, despite its slower pipeline per attempt —
+fewer attempts should be needed.
 
 ### Pipeline timings, Bunny / Dragon Stand2 / Ramses (Apple M1, 2026-08-18 – 19)
 
@@ -764,6 +886,12 @@ operator chose to stop each one).
 | `bunny-v1.0-vs8abs` (5-tier control) | 1.44 s | 4,083.1 s (~68.1 min) | 531.1 s | 405.7 s | 2,498 s (~41.6 min) | 5,021.3 s |
 | `dragonstand2-v1.0-vs8` | 10.2 s | 3,893.2 s (~64.9 min) | 587.2 s | 806.0 s | 1,149 s (~19.2 min) | 5,296.6 s |
 | `ramses-v1.0-vs8` | 2.0 s | 11,420.9 s (~190.3 min) | 1,435.9 s (~23.9 min) | 1,029.6 s (~17.2 min) | 1,059 s (~17.7 min) | 12,889.4 s (~214.8 min) |
+| `dragonstand2-v1.0-halfshift-cd75-h1h26` (fitted, run 6 of 6) | ~10 s | 1,486 s (~24.8 min) | 175 s | 439 s | ~600 s (~10 min)¹ | 2,110 s (~35.2 min) |
+
+¹ From the Opus agent's own working notes (`dragonstand2-scratch.md`),
+not independently re-timed against file mtimes the way every other row's
+"time to first `finalMesh.vtk`" was — reported here as approximate for
+that reason, everything else in the row is exact from the run's own log.
 
 Two patterns worth noting. **Octree construction time tracks threshold
 tightness almost exactly**, within each model — Bunny's own configs span
@@ -789,7 +917,13 @@ per-model-fitting story: even models sharing a ladder rung don't share a
 threshold-mismatch magnitude. A reminder that "cheap to test via
 `refine_criteria_stats` first" (the recipe item in the Synthesis
 above) matters more, not less, as a model's octree gets deeper, since the
-full-run cost of a wrong guess grows with it.
+full-run cost of a wrong guess grows with it. Confirmed directly by
+Dragon Stand2's own fitted run: once its thresholds were tightened to the
+right neighborhood, octree construction dropped from 3,893.2 s to 1,486 s
+(2.6x faster) — the same "tighter thresholds build a cheaper octree"
+relationship the Bunny table above shows within its own config family,
+now shown to hold across a model's fitting process too, not just
+across different models' shipped baselines.
 
 **Open threads for the next session:**
 
@@ -821,27 +955,31 @@ full-run cost of a wrong guess grows with it.
    alone with any single choice of ladder-scaling rule tried so far.
 3. **Bunny's residual gap — closed to +3.0%/+3.8%.** See "Best Bunny
    reproduction reached" above.
-4. **Dragon Stand2 — run, and it confirms the per-model-thresholds
-   conclusion a third time.** See above; not yet fitted the way Bottle1
-   and Bunny were (stopped once the headline overshoot was clear), a
-   natural next step whenever this resumes. Its dramatically slower
-   pipeline (65 min octree construction alone, vs. Bottle1/Bunny's few
-   hundred seconds) is itself worth a closer look before assuming its
-   `C_THRES`/`H_THRES` fitting will be as cheap as the other two models'
-   was via `refine_criteria_stats`.
-5. **Ramses — run, and it's the most severe case yet.** See above;
-   +448%/+473% overshoot at shipped thresholds, the worst of any model
-   this session, and the slowest pipeline (~3.6 hours) — not yet fitted.
-   Given the cost of a blind full run at this model's scale, the
-   `refine_criteria_stats`-first approach is the clear next step rather
-   than another direct full-run guess.
+4. **Dragon Stand2 — fitted to −0.43%/−0.49%, the best reproduction of
+   any Table 2 model to date.** See "Finding 15" and the results table
+   above. Along the way, found the tier-independence rule that turns
+   every future model's threshold fit from a search into a mechanical
+   per-tier match.
+5. **Ramses — run at shipped thresholds, not yet fitted.** +448%/+473%
+   overshoot, the worst of any model this session, and the slowest
+   pipeline (~3.6 hours). Given Finding 15, the next attempt should go
+   straight to a mechanical per-tier fit (`refine_criteria_stats` +
+   `level_histogram.py --parents`, tighten-only, shallow to deep) rather
+   than another blind full-run guess — should need fewer attempts than
+   Dragon Stand2's six, despite the slower pipeline per attempt.
 6. Table 2's remaining eight models, per the ladder-derivation table
-   above — the ladder-position prediction has now held on four
-   consecutive models (Bottle1, Bunny, Dragon Stand2, Ramses), so treat
-   it as reliable and spend the effort on the threshold fit instead,
-   which has not transferred cleanly between any pair tried yet, not even
-   between two models sharing the same ladder rung (Dragon Stand2 vs.
-   Ramses).
+   above — the ladder-position prediction now has direct reference-mesh
+   support on all twelve (see the full-table check above), so it's
+   reliable enough to stop re-verifying per model and spend the effort on
+   the threshold fit instead, which Finding 15 makes tractable but which
+   still has not transferred cleanly between any pair of *already-fitted*
+   models tried, not even two sharing the same ladder rung (Dragon
+   Stand2, Ramses).
+7. **The worst-SJ/convergence-stall phenomenon** (eight occurrences
+   across four models now) and the newly-found `ProjectToIsoSurface`
+   segfault (Finding 15) are both still open, unexplained, and
+   potentially related — worth a dedicated investigation session rather
+   than continuing to note each new occurrence in passing.
 
 ## Bone (calibration testbed, not a Table 2 model)
 
@@ -965,29 +1103,44 @@ across all three:**
    that overshoots by 5-6x). Treat it as the default explanation, not the
    exception.
 3. **Treat `C_THRES`/`H_THRES`/`CELL_DETECT` as a small fitting problem,
-   not a lookup.** `refine_criteria_stats` sweeps candidate counts in
-   single-digit seconds, versus the 5-40+ minute octree stage alone for a
-   full run — use it to narrow the threshold search before committing to
-   an expensive end-to-end run. The per-tier refined-parent-count
-   diagnostic introduced this session (recursing a level's leaf count
-   upward, `N/8` per tier, and comparing tier-by-tier against the
-   reference) is sharper than comparing mesh totals, because it localizes
-   *which* tier is off rather than just *how much*.
+   not a lookup — and fit it mechanically now, not by search.**
+   `refine_criteria_stats` sweeps candidate counts in single-digit
+   seconds, versus the 5-190+ minute octree stage alone for a full run —
+   use it to narrow the threshold search before committing to an
+   expensive end-to-end run. The per-tier refined-parent-count diagnostic
+   (recursing a level's leaf count upward, `N/8` per tier, and comparing
+   tier-by-tier against the reference) is sharper than comparing mesh
+   totals, because it localizes *which* tier is off rather than just *how
+   much* — and, per Finding 15 (Dragon Stand2's session), that
+   per-tier comparison isn't just a diagnostic, it's the fit itself:
+   tightening a tier's own threshold affects that tier exactly and
+   nothing shallower, so matching each tier's parent count to the
+   reference, working in any order but only ever tightening, converges
+   mechanically rather than by trial and error. The one thing to avoid is
+   loosening a tier that has tiers beneath it — that propagates upward
+   unpredictably in magnitude (though always in the same direction) and
+   can invert an otherwise-correct adjustment elsewhere.
 4. **Budget for a stall — and expect it, not just tolerate it.** Every
    model attempted long enough has hit a multi-hour plateau in
    `ProjectToIsoSurface` at some configuration: Bottle1's original input
-   (Finding 13, resolved — a genuine duplicate-triangle bug) and, this
-   session, three of Bunny's seven configurations, including its own best
-   reproduction (`rl4-halfshift-c145` plateaued on worst SJ for over an
-   hour after its mesh size had already converged). None of Bunny's cases
-   have a known input defect the way Bottle1's did, so four occurrences
-   across two models now looks like a general property of this
-   gradient-descent projection method rather than a per-model artifact —
-   still unexplained, but common enough to plan around rather than treat
-   as one-off. A `finalMesh.vtk` that never arrives, or one that arrives
-   but never ratchets further, isn't necessarily a dead end either way:
-   `projHex.vtk`'s point/cell count stabilizing over a long plateau is
-   usable evidence that the mesh *topology* has settled even without full
+   (Finding 13, resolved — a genuine duplicate-triangle bug), three of
+   Bunny's seven configurations (including its own best reproduction,
+   which plateaued on worst SJ for over an hour after its mesh size had
+   already converged), and all five of Dragon Stand2's full runs (pinned
+   at the initial worst-SJ gate every time). None of Bunny's or Dragon
+   Stand2's cases have a known input defect the way Bottle1's did, so
+   eight occurrences across four models now looks like a general property
+   of this gradient-descent projection method rather than a per-model
+   artifact — still unexplained, but common enough to plan around rather
+   than treat as one-off. Separately, Dragon Stand2's fit also turned up
+   a genuine crash (`EXC_BAD_ACCESS` inside `ProjectToIsoSurface`,
+   reproducible for one specific configuration) — a different failure
+   mode from the stall, worth distinguishing from it when triaging a run
+   that didn't finish cleanly. A `finalMesh.vtk` that never arrives, or
+   one that arrives but never ratchets further, isn't necessarily a dead
+   end either way: `projHex.vtk`'s point/cell count stabilizing over a
+   long plateau is usable evidence that the mesh *topology* has settled
+   even without full
    point-position convergence, and worst SJ never climbing doesn't affect
    that topology at all.
 
