@@ -645,9 +645,52 @@ at a different rung of the ladder (`VOXEL_SIZE_VALUE=8` vs. Bunny/Bottle1's
 7). The ladder-position prediction held — this wasn't a five-tier-style
 catastrophic failure, "only" roughly double — but the threshold values
 once again needed their own fit, a third independent confirmation of the
-synthesis above. Not pursued further this session (stopped once the
-answer was clear, to leave CPU for closing out Bunny); a natural next step
-whenever this resumes.
+synthesis above.
+
+### Pipeline timings, Bunny / Dragon Stand2 / Ramses (Apple M1, 2026-08-18)
+
+Same per-stage `clock()` prints `Main.cpp` reports for every run (see the
+Bottle1 pipeline timings table above for the M4/2026-07-02 and
+M1/2026-08-04-05 numbers; this table is a separate day/session, kept
+apart rather than merged into one giant table). "Time to first
+`finalMesh.vtk`" is the wall-clock gap between the "extracting interior
+dual mesh" print (buffer clearing done, topology essentially fixed) and
+that run's `finalMesh.vtk` mtime — the time `ProjectToIsoSurface` needed
+to reach its *first* zero-bad-element checkpoint, not total time spent
+ratcheting `ELEM_THRES` further afterward (which several runs were left
+doing well past this point, per the results tables above, and isn't a
+comparable quantity run-to-run since it depends entirely on when a human
+operator chose to stop each one).
+
+| Run | Read | Octree | Dualization | Buffer clearing | Time to first `finalMesh.vtk` | Sum through buffer clearing |
+|---|---|---|---|---|---|---|
+| `bunny-v1.0-rl4-shift1-cd75` | 1.44 s | 58.0 s | 7.3 s | 33.1 s | 57 s | 99.9 s |
+| `bunny-v1.0-rl4-halfshift-cd75` | 1.44 s | 136.7 s | 17.4 s | 50.0 s | *(never — stuck, see above)* | 205.5 s |
+| `bunny-v1.0-rl4-halfshift-c145` | 1.42 s | 168.7 s | 21.5 s | 53.1 s | 632 s (~10.5 min) | 244.7 s |
+| `bunny-v1.0-rl4-cd75` | 1.43 s | 320.6 s | 41.4 s | 76.9 s | *(never — stuck, see above)* | 440.3 s |
+| `bunny-v1.0-rl4` (plain) | 1.43 s | 430.2 s | 54.5 s | 89.6 s | 1,277 s (~21.3 min) | 575.7 s |
+| `bunny-v1.0-rl4-h2x-cd75` | 1.39 s | 410.7 s | 51.9 s | 83.9 s | 7,283 s (~121.4 min) | 547.9 s |
+| `bunny-v1.0-rl4-h3` | 1.40 s | 471.7 s | 58.2 s | 91.6 s | 451 s (~7.5 min) | 622.9 s |
+| `bunny-v1.0-vs8abs` (5-tier control) | 1.44 s | 4,083.1 s (~68.1 min) | 531.1 s | 405.7 s | 2,498 s (~41.6 min) | 5,021.3 s |
+| `dragonstand2-v1.0-vs8` | 10.2 s | 3,893.2 s (~64.9 min) | 587.2 s | 806.0 s | 1,149 s (~19.2 min) | 5,296.6 s |
+| `ramses-v1.0-vs8` | 2.0 s | *in progress* | — | — | — | — |
+
+Two patterns worth noting. **Octree construction time tracks threshold
+tightness almost exactly**, within each model — Bunny's own configs span
+a 7.4x range (58.0 s to 471.7 s) purely from how permissive `C_THRES`/
+`H_THRES` are, cleanly ordered `shift1` (tightest) < `halfshift-c145` <
+`halfshift-cd75` < `cd75` < `h2x-cd75` ≈ `plain` < `h3` (loosest) — the
+same ordering as the mesh-size results table above, which makes sense
+since a looser threshold means more octree cells get flagged for
+refinement, which is directly what this stage computes. **`vs8abs` and
+`dragonstand2-v1.0-vs8` are the two outliers, both around an hour of
+octree time alone**, and for the same underlying reason: both build a
+substantially deeper/denser octree than any Bunny-`rl4` config, one from
+testing the wrong (too-deep) ladder rung and one from Dragon Stand2's own
+scale and detail at its *correct* rung — a reminder that "cheap to test
+via `refine_criteria_stats` first" (the recipe item in the Synthesis
+above) matters more, not less, as a model's octree gets deeper, since the
+full-run cost of a wrong guess grows with it.
 
 **Open threads for the next session:**
 
