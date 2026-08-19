@@ -859,6 +859,32 @@ refined-parent counts, which should make Ramses considerably cheaper to
 fit than Dragon Stand2 was, despite its slower pipeline per attempt —
 fewer attempts should be needed.
 
+**Ramses fitting, applying Finding 15 directly — in progress.** Per-tier
+parent-count ratios (shipped-baseline `finalMesh.vtk` vs. reference,
+using the `level6<-5`/`level7<-6`/`level8<-7`/`level9<-8` tier mapping
+established for this ladder rung) showed a far more lopsided mismatch
+than Dragon Stand2's: tier1 (level 5→6) only +13% over, tier2 (level
+6→7) **+217%**, tier3 (level 7→8) **+3,065%** — by a wide margin the most
+extreme single-tier overshoot found this session, concentrated almost
+entirely in curvature (`refine_criteria_stats` shows tier2/tier3
+candidate counts barely move under `H_THRES` sweeps but drop sharply
+under `C_THRES` sweeps). Round 1 (`C_THRES = {0.15, 0.3, 1.0, 2.2, 2.4}`,
+`H_THRES` shipped, `CELL_DETECT = 0.75`, tiers 2 and 3 tightened, tier 1
+left alone) converged to **104,067 / 90,483** against the 44,790 / 37,993
+target — **+132% / +138%**, a large improvement on the shipped baseline's
++448%/+473% but still far off. Its octree stage ran in 31.8 minutes
+(1,905.6 s), a 6x speedup from the shipped baseline's 190.3 minutes —
+consistent with the tighter-thresholds-build-cheaper-octrees pattern
+holding here too. Per-tier parent ratios after round 1: tier1 now close
+(1.11x reference — leave alone, per Finding 15's tighten-only rule),
+tier2 still 2.22x over, tier3 still 6.92x over. Tier3's curvature
+candidates alone bottom out around a thickness-driven floor (~108-135
+regardless of how tight `C_THRES[3]` goes), so closing the remaining gap
+needed tightening `H_THRES[3]` as well, not `C_THRES[3]` alone — round 2
+(`C_THRES = {0.15, 0.3, 2.0, 3.5, 2.4}`, `H_THRES = {16, 8, 4, 1.5, 1}`,
+`CELL_DETECT` unchanged) launched to test both tiers tightened together,
+in flight as of this entry.
+
 ### Pipeline timings, Bunny / Dragon Stand2 / Ramses (Apple M1, 2026-08-18 – 19)
 
 Same per-stage `clock()` prints `Main.cpp` reports for every run (see the
