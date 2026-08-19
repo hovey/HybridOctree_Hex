@@ -109,6 +109,23 @@ the full recipe and derivation.
 | [Gao 2019](https://cims.nyu.edu/gcl/papers/2019-OctreeMeshing.pdf) | 35,330 | 29,698 | 0.292 | 0.999 | 4 | 3,569 | 59.5 |
 | [Zhang 2013](https://doi.org/10.1016/j.cma.2012.12.020) | 119,799 | 106,730 | 3.85×10⁻⁵ | 1.0 | 3 | 258 | 4.3 |
 | **[Tong 2024](https://arxiv.org/pdf/2401.05984)** | **26,375** | **21,695** | **0.570** | **1.0** | **4** | **358** | **6.0** |
+| * | 27,175 | 22,525 | 0.010¹ | 1.0 | 4 | ~877² | ~14.6² |
+
+¹ Mesh size and topology converged normally; the worst-SJ ratchet did not.
+`smallDist` never re-crossed the convergence tolerance needed to advance
+past its initial checkpoint, so this value is the ratchet's starting
+rung, not a converged property of the mesh (same phenomenon as Bottle1's
+row above, more severe here — see the Bunny section below, "Worst SJ
+never left the initial 0.01 gate").
+
+² Approximate, on the same basis as Bottle1's footnote above: summed
+internal stage timers (read + octree + dualization + buffer clearing,
+244.7 s) plus the wall-clock gap from buffer clearing to this run's
+`finalMesh.vtk` write (632 s). Config: `v1.0` source, `C_THRES =
+{0.2121, 0.4243, 0.8485, 1.45, 3.3941}`, `H_THRES = {11.3137, 5.6569,
+2.8284, 1.4142, 0.7071}`, `CELL_DETECT = 0.75`, four-tier `rl4` ladder
+(`VOXEL_SIZE_VALUE=7`, `LADDER_TOP=octreeDepth`) — see the Bunny section
+below for the full recipe and derivation.
 
 ### 3. David (Genus-0)
 
@@ -130,6 +147,23 @@ the full recipe and derivation.
 |---|---|---|---|---|---|---|---|
 | [Gao 2019](https://cims.nyu.edu/gcl/papers/2019-OctreeMeshing.pdf) | 74,618 | 61,441 | 0.0290 | 0.999 | 5 | 23,062 | 384.4 |
 | **[Tong 2024](https://arxiv.org/pdf/2401.05984)** | **62,576** | **50,853** | **0.560** | **1.0** | **4** | **2,052** | **34.2** |
+| * | 62,307 | 50,603 | 0.010¹ | 1.0 | 4 | ~2,710² | ~45.2² |
+
+¹ Mesh size and topology converged normally; the worst-SJ ratchet did
+not. Every one of this study's Dragon Stand2 fitting runs was pinned at
+this same initial-checkpoint value — see the Bunny section below, Finding
+15, for the full pattern.
+
+² Approximate, on the same basis as Bottle1's footnote above: summed
+internal stage timers (read + octree + dualization + buffer clearing,
+2,110 s, itself the sixth of six fitting rounds run for this model — see
+Finding 15 below) plus the wall-clock gap from buffer clearing to this
+run's `finalMesh.vtk` write (~600 s, itself an approximation carried over
+from that same source). Config: `v1.0` source, `C_THRES = {0.21213203,
+0.42426407, 0.84852814, 1.69705627, 3.39411255}`, `H_THRES = {11.3137085,
+4.45, 2.6, 1.41421356, 0.70710678}`, `CELL_DETECT = 0.75`, four-tier
+`rl4` ladder (`VOXEL_SIZE_VALUE=8`, `LADDER_TOP=octreeDepth`) — see the
+Bunny section below for the full recipe and derivation.
 
 ### 6. Gargoyle (Genus-0)
 
@@ -168,6 +202,17 @@ report a value for that cell.)*
 |---|---|---|---|---|---|---|---|
 | [Gao 2019](https://cims.nyu.edu/gcl/papers/2019-OctreeMeshing.pdf) | 54,634 | 46,923 | 0.0161 | 0.999 | 4 | 9,395 | 156.6 |
 | **[Tong 2024](https://arxiv.org/pdf/2401.05984)** | **44,790** | **37,993** | **0.590** | **1.0** | **4** | **713** | **11.9** |
+| * | 46,329 | 39,529 | 0.570 | 1.0 | 4 | ~1,692¹ | ~28.2¹ |
+
+¹ Approximate, on the same basis as Bottle1's footnote above: summed
+internal stage timers (read + octree + dualization + buffer clearing,
+634.3 s, from the second of two fitting rounds — see the Bunny section
+below) plus the wall-clock gap from buffer clearing to this run's
+`finalMesh.vtk` write (1,058 s). Config: `v1.0` source, `C_THRES =
+{0.15, 0.3, 2.0, 3.5, 2.4}`, `H_THRES = {16, 8, 4, 1.5, 1}`, `CELL_DETECT
+= 0.75`, four-tier `rl4` ladder (`VOXEL_SIZE_VALUE=8`,
+`LADDER_TOP=octreeDepth`) — see the Bunny section below for the full
+recipe and derivation.
 
 ### 11. Red Circular Box (Genus-0)
 
