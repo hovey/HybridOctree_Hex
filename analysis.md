@@ -598,9 +598,9 @@ ever re-crossing the `1e-4` convergence tolerance needed to trigger the
 next success and raise the bar. Stopped once the plateau was clearly
 stable rather than transient. This is the same stuck-point signature
 Finding 13 first identified on Bottle1 (there, root-caused to a genuine
-input-file bug) and that two of this session's other five Bunny configs
-also hit — but `bunny_tri.raw` has no known defect, so on its own this
-occurrence doesn't point to a cause. Four independent stuck-point
+input-file bug) and that two of this session's other six Bunny configs
+(`rl4-cd75`, `rl4-halfshift-cd75`) also hit — but `bunny_tri.raw` has no
+known defect, so on its own this occurrence doesn't point to a cause. Four independent stuck-point
 observations across two models is enough to say the phenomenon is common
 for this gradient-descent projection method generally, not a
 `bunny_tri.raw`- or Bottle1-specific artifact — worth investigating on its
