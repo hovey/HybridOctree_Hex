@@ -551,12 +551,20 @@ scale-relative `H_THRES` multiplier is `2^(4 - (ladderTop - 4))`:
 
 `bone`'s row falls straight out of this rule as *exactly* the shipped
 configuration — a real independent validation, since `bone` is the one
-model this repo reproduces byte-exactly. Caveat: the "deepest real level"
-read is itself ambiguous at low population counts (`bone`'s reference has
-only 51 cells at level 9 — if judged by a naive "any cells present"
-threshold rather than a distortion-tail read, it would misclassify as
-level 8) — this is the same kind of question as Bottle1's/Bunny's level-8
-distortion tails.
+model this repo reproduces byte-exactly. Its own level histogram
+(`level_histogram.py`: level 5-9 at 9.72%/43.75%/31.13%/14.80%/0.59%)
+shows the same signature as every other model's distortion tail — level
+9's 51 cells are a ~25× drop from level 8, not a smooth continuation — so
+`bone` is 5 real tiers (levels 4-8), consistent with the shipped
+`LADDER_TOP=8` setting it happens to reproduce exactly. A naive "any cells
+present" read would have misclassified level 9 as a real sixth tier; the
+relative-magnitude test (is the deepest population a small fraction with
+a sharp drop, or a smooth continuation of the level above) is what
+resolves it correctly here — the same test that resolves David's
+sixth-tier question below, and by this point checked against five models
+(`bone`, Bottle1, Bunny, Dragon Stand2, David) without a single
+miscall — worth trusting as reliable rather than treating each new
+model's deepest-level population as an open question to re-litigate.
 
 **David's sixth-tier question, reconciled** (checked directly with
 `level_histogram.py`, not reasoned about abstractly): `david.vtk`'s full
