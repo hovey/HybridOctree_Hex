@@ -647,7 +647,27 @@ catastrophic failure, "only" roughly double — but the threshold values
 once again needed their own fit, a third independent confirmation of the
 synthesis above.
 
-### Pipeline timings, Bunny / Dragon Stand2 / Ramses (Apple M1, 2026-08-18)
+**Ramses — the worst shipped-threshold mismatch found this session.**
+`runs/ramses-v1.0-vs8/` (`VOXEL_SIZE_VALUE=8`, `LADDER_TOP=octreeDepth`,
+shipped `C_THRES`/`H_THRES`, default `CELL_DETECT=1` — same ladder rung
+and same baseline recipe as Dragon Stand2, per the ladder-derivation
+table, so a natural same-rung comparison) converged to **245,386 /
+217,727** against Table 2's **44,790 / 37,993** — a **+448% / +473%
+overshoot**, by far the largest of any model tried this session
+(Bunny's worst was +82%, Dragon Stand2's was +94%). The pre-projection
+`dualHex.vtk` was already 4.3x oversized (191,606 / 163,949) before
+projection's usual element-splitting growth compounded it further. Two
+models sharing the same ladder rung and the same shipped-threshold
+baseline (Dragon Stand2: +88-94%, Ramses: +448-473%) landing five times
+further apart than either is from its own target is strong further
+evidence against any single per-rung correction factor — the fitting
+really is per-model, not even per-ladder-rung. Not pursued to a fit this
+session (its ~3.6-hour pipeline, by far the slowest of any model run,
+made even one exploratory full run an expensive commitment; the sharper
+`refine_criteria_stats`-first approach used for Bunny is the obvious next
+step before attempting a second Ramses run).
+
+### Pipeline timings, Bunny / Dragon Stand2 / Ramses (Apple M1, 2026-08-18 – 19)
 
 Same per-stage `clock()` prints `Main.cpp` reports for every run (see the
 Bottle1 pipeline timings table above for the M4/2026-07-02 and
@@ -673,7 +693,7 @@ operator chose to stop each one).
 | `bunny-v1.0-rl4-h3` | 1.40 s | 471.7 s | 58.2 s | 91.6 s | 451 s (~7.5 min) | 622.9 s |
 | `bunny-v1.0-vs8abs` (5-tier control) | 1.44 s | 4,083.1 s (~68.1 min) | 531.1 s | 405.7 s | 2,498 s (~41.6 min) | 5,021.3 s |
 | `dragonstand2-v1.0-vs8` | 10.2 s | 3,893.2 s (~64.9 min) | 587.2 s | 806.0 s | 1,149 s (~19.2 min) | 5,296.6 s |
-| `ramses-v1.0-vs8` | 2.0 s | 11,420.9 s (~190.3 min) | 1,435.9 s (~23.9 min) | 1,029.6 s (~17.2 min) | *in progress* | 12,889.4 s (~214.8 min) |
+| `ramses-v1.0-vs8` | 2.0 s | 11,420.9 s (~190.3 min) | 1,435.9 s (~23.9 min) | 1,029.6 s (~17.2 min) | 1,059 s (~17.7 min) | 12,889.4 s (~214.8 min) |
 
 Two patterns worth noting. **Octree construction time tracks threshold
 tightness almost exactly**, within each model — Bunny's own configs span
@@ -739,11 +759,19 @@ full-run cost of a wrong guess grows with it.
    hundred seconds) is itself worth a closer look before assuming its
    `C_THRES`/`H_THRES` fitting will be as cheap as the other two models'
    was via `refine_criteria_stats`.
-5. Table 2's remaining nine models, per the ladder-derivation table above —
-   the ladder-position prediction has now held on three consecutive
-   models (Bottle1, Bunny, Dragon Stand2), so treat it as reliable and
-   spend the effort on the threshold fit instead, which has not
-   transferred cleanly on any pair tried yet.
+5. **Ramses — run, and it's the most severe case yet.** See above;
+   +448%/+473% overshoot at shipped thresholds, the worst of any model
+   this session, and the slowest pipeline (~3.6 hours) — not yet fitted.
+   Given the cost of a blind full run at this model's scale, the
+   `refine_criteria_stats`-first approach is the clear next step rather
+   than another direct full-run guess.
+6. Table 2's remaining eight models, per the ladder-derivation table
+   above — the ladder-position prediction has now held on four
+   consecutive models (Bottle1, Bunny, Dragon Stand2, Ramses), so treat
+   it as reliable and spend the effort on the threshold fit instead,
+   which has not transferred cleanly between any pair tried yet, not even
+   between two models sharing the same ladder rung (Dragon Stand2 vs.
+   Ramses).
 
 ## Bone (calibration testbed, not a Table 2 model)
 
@@ -904,6 +932,7 @@ across all three:**
 | 2026-08-05 | M1 | Root-caused the mesh-size gap to two separate issues — the shipped curvature thresholds didn't match the paper's stated values, and (independently) this codebase's curvature *formula* doesn't match the paper's stated formula either.<br><br>Recalibrated empirically using `bone` as a fast testbed, which fixed `bone`'s mesh size well and got Bottle1's convergence *quality* to match closely — but Bottle1's mesh size and, especially, its runtime (~27x slower than `bone` even fully calibrated) remained largely unmoved.<br><br>Spent most of the day testing *why*, testing four hypotheses for the over-refinement:<ul><li>`C_THRES` alone — tested and refuted</li><li>`H_THRES` alone — tested and refuted</li><li>octree-balancing propagation — tested and refuted</li><li>spatial dispersion of refinement candidates — real but insufficient effect</li></ul>Also traced a related finding in the sibling `HexOpt` repo: its restored optimizer code looks structurally like `HybridOctree_Hex`'s own older algorithm, not the CAD 2026 paper's claimed method, backed by a definitive date-based proof (see `hovey/HexOpt`'s README). |
 | 2026-08-17 | M1 | Switched strategy from threshold-guessing to git archaeology. Found that the repo's `/our results/bottle1.vtk`, committed by the paper's first author Tong one day before the `v1.0` tag and never touched since, reproduces Table 2's Bottle1 numbers **exactly** (36,091 verts / 30,145 elems / worst SJ 0.560000 / best SJ 1.0, via `scaled_jacobian_stats`) — strong evidence it's the actual paper output file, not just a close match.<br><br>Statically diffed source across every upstream tag (`v1.0`→`v1.1`→`v1.2`→`v1.3`→current `HEAD`) and found the 2026-08-05 calibration work had anchored `C_THRES` to `v1.2`'s values — but `v1.0`/`v1.1`'s own original constants (`C_THRES={0.15,0.3,0.6,1.2,2.4}`, `VOXEL_SIZE=9`), the closest available source snapshot in time to the reference mesh, had never been tried.<br><br>Built and ran both `v1.0` and `v1.1` against the recovered original 2024-01-11 input surface. Both got permanently stuck at the same point in the final projection stage (never reached Table 2's numbers), which reframed the investigation: not a `v1.0`-vs-`v1.1` code-version question after all, but something about specific local geometry in Bottle1's input surface that this gradient-descent projection method can't resolve regardless of version.<br><br>Along the way, corrected two initial misreadings (see Detailed log for the full trail): `c291245` (2024-01-11, used for today's runs) has an off-by-one header bug that makes `ReadRawData()` silently duplicate its last triangle, while `f3247d8` (2024-01-16) parses cleanly; and `v1.1`'s new code block turned out to be a post-convergence step, not stuck-recovery logic, so it never actually ran in either attempt — the real cause of `v1.0`/`v1.1`'s differing exploration patterns is still open. `v1.1` left running as a low-priority background check; next step is a targeted dump of the local triangle neighborhood around the stuck point.<br><br>**Later the same day, both open questions closed.** Instead of dumping the triangle neighborhood, switched to measuring octree levels directly off the meshes — every model is rescaled into a fixed 100-unit cube, so a hex's edge length *is* its octree cell size and its level is just `log2(100/edge)`. That turned the whole problem from inference into measurement.<br><br>Three results followed. (1) `v1.0`'s shipped constants are the paper's constants: run unmodified on `bone` they reproduce `our results/bone.vtk` **exactly** — 10,356 / 8,619 / 0.610001 / 1.0, with byte-identical cell connectivity — so every earlier session's threshold calibration was solving a problem that did not exist. (2) Bottle1's reference mesh sits exactly on the committed input surface (max boundary deviation 0.00000), so the input was never the variable either; the one remaining variable is how deep the octree refines, and Table 2's "Refinement Level" column turns out to report exactly that — the number of active refinement tiers, verified against every Table 2 model's reference mesh. Bottle1 used **four** tiers where the public code hardcodes five, which alone accounts for the entire 3.4x oversizing: 101,688 elements → 27,750. (3) The all-day projection stalls were caused by `c291245`'s duplicated triangle — a controlled same-config comparison has `c291245` frozen forever at `smallDist=1.399` while `f3247d8` converges cleanly — so the header-correct file is the one to reproduce against, reversing this morning's choice.<br><br>Best configuration reached: 35,535 verts / 29,943 elems against 36,091 / 30,145 (−1.5% / −0.7%), with octree levels 6 and 7 — 93% of the mesh — matching to 0.5% and 0.1%. The last ~1% is not uniquely pinned by the evidence, and probably cannot be: the reference mesh predates the first committed source by a day. |
 | 2026-08-18 | M1 | Moved to Bunny, run as two parallel independent efforts (a Sonnet session plus a background Opus agent) to test whether Bottle1's Finding-14 recipe transfers to a model it wasn't tuned on. It doesn't: applied as-is, it overshoots Bunny by 70% (43,691/36,901 vs. 26,375/21,695). Six threshold configurations tried, all confirmed by session's end (two via a clean `finalMesh.vtk`, two via a stabilized `projHex.vtk` after 2+ hour plateaus, matching a stuck-point pattern Finding 13 first saw on Bottle1); the family is cleanly monotonic in threshold tightness. Devised a sharper diagnostic — refined-parent counts per octree tier rather than mesh totals — which shows the error compounding roughly 2× per tier across every plain-`rl4`-family config, the signature of a scaling problem rather than a single bad threshold. Derived and tabulated `VOXEL_SIZE`/`LADDER_TOP` settings for all remaining Table 2 models from the ladder-position/level relationship. Caught a methodology bug from the session's own early hours: `dualHex.vtk`'s point/cell count (pre-projection) is not a safe stand-in for `finalMesh.vtk`'s (post-projection can add 40-50% more elements by splitting low-quality ones). Cross-validated the best candidate (a `√2` "half-level" scale correction) against Bottle1 directly: it undershoots by 45%, the opposite direction from Bunny's overshoot under Bottle1's own recipe — a decisive negative result, settling that **the thresholds are genuinely per-model, not one universal rule**, while the ladder-depth ("Refinement Level") reading keeps holding up on every model. Closed Bunny's own gap anyway by tuning one purely-curvature-gated tier (`C_THRES[3]`: 1.6971→1.45), reaching **27,175/22,525 vs. 26,375/21,695 (+3.0%/+3.8%)** on the first attempt — Bunny's best reproduction, comparable to Bottle1's own (−1.5%/−0.7%, opposite direction). Ran Dragon Stand2 as a third-model check (different ladder rung, `VOXEL_SIZE_VALUE=8`): ladder position held, thresholds again didn't transfer (+88%/+94%), a third independent confirmation. Closed with a cross-cutting synthesis section on what `bone`/Bottle1/Bunny collectively show, and a practical four-step recipe for future models. |
+| 2026-08-19 | M1 | Formalized the level-histogram methodology as a real tool, `scripts/level_histogram.py` (12-edge-mean metric, plus the per-tier refined-parent-count diagnostic), replacing the one-off code from the day before. Used it to resolve two open questions cleanly: `bone`'s level-9 population (0.59%, a ~25x drop from level 8) and David's level-10 population (0.71%, a 29x drop from level 9) are both genuine distortion tails, while David's level-9 population (20.77%, the *second-largest* band in the mesh) is real — so David does need six tiers as Table 2 claims, and the "open reconciliation" between Findings 9 and 10 noted the day before was an artifact of applying the distortion-tail heuristic too loosely; checked against five models now (`bone`, Bottle1, Bunny, Dragon Stand2, David) without a miscall. Ran Ramses as a fourth-model ladder-position check (same rung as Dragon Stand2, `VOXEL_SIZE_VALUE=8`): ladder held, but the shipped-threshold mismatch was far more severe than any other model — +448%/+473% overshoot, a ~3.6-hour pipeline (its octree stage alone, 190 minutes, is the slowest single stage measured this session, on a *smaller* input than Dragon Stand2's), traced to a 4.3x-oversized pre-projection octree. Two same-ladder-rung models (Dragon Stand2, Ramses) landing five times further apart from each other than either is from its own target further rules out a per-rung correction shortcut. Added a full pipeline-timings table across every Bunny/Dragon Stand2/Ramses run. A background Opus agent worked Dragon Stand2's threshold fit in parallel throughout, using `refine_criteria_stats` sweeps and its own full-run tests — result pending at the time of this entry. |
 
 ## Detailed log
 
