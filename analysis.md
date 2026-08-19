@@ -586,11 +586,30 @@ presumably narrow the remaining ~3% further, but wasn't pursued past this
 point — Bottle1's own experience (Finding 14) is that the last few percent
 sits in a fitted, not derived, regime once the ladder and gross threshold
 scale are right, so further digits likely trade one arbitrary choice for
-another rather than revealing anything new. Worst SJ at time of writing is
-still an early ratchet value (0.01, the initial gate) — being left running
-to reach a value comparable to Table 2's reported 0.570, which (per every
-other model's own results table above) is a stopping point on the
-`ELEM_THRES` ratchet, not an independent property of the mesh.
+another rather than revealing anything new.
+
+**Worst SJ never left the initial 0.01 gate — a fourth stuck-point case.**
+Left running for over an hour past the `finalMesh.vtk` write hoping
+`ELEM_THRES` would ratchet up toward Table 2's reported 0.570 the way it
+did for Bottle1 (which walked through 0.550, then 0.570001, before being
+stopped). It didn't: `smallDist` oscillated in a tight 0.10–0.11 band on
+the same worst point (index 13419) for over 5,000 checkpoints without
+ever re-crossing the `1e-4` convergence tolerance needed to trigger the
+next success and raise the bar. Stopped once the plateau was clearly
+stable rather than transient. This is the same stuck-point signature
+Finding 13 first identified on Bottle1 (there, root-caused to a genuine
+input-file bug) and that two of this session's other five Bunny configs
+also hit — but `bunny_tri.raw` has no known defect, so on its own this
+occurrence doesn't point to a cause. Four independent stuck-point
+observations across two models is enough to say the phenomenon is common
+for this gradient-descent projection method generally, not a
+`bunny_tri.raw`- or Bottle1-specific artifact — worth investigating on its
+own terms rather than continuing to treat each occurrence as one-off. Per
+the mesh-size result above, this doesn't affect Bunny's headline
+reproduction — as the Bottle1 section already established, worst SJ is a
+stopping point on the ratchet, not an independent property of the mesh,
+and the mesh itself (size, topology) was unaffected by never reaching a
+higher rung.
 
 **Dragon Stand2 — first check of whether any of this transfers to a model
 with a different max level, and it doesn't, the same way Bunny didn't
@@ -782,16 +801,23 @@ across all three:**
    upward, `N/8` per tier, and comparing tier-by-tier against the
    reference) is sharper than comparing mesh totals, because it localizes
    *which* tier is off rather than just *how much*.
-4. **Budget for a stall.** Every model attempted long enough has hit a
-   multi-hour plateau in `ProjectToIsoSurface` at some configuration —
-   Bottle1's original input (Finding 13, resolved: a genuine duplicate-
-   triangle bug) and, this session, two of Bunny's six configurations
-   (unresolved — `bunny_tri.raw` has no known input defect, so this looks
-   like a harder, still-open question about the gradient-descent
-   projection method itself). A `finalMesh.vtk` that never arrives isn't
-   necessarily a dead end: `projHex.vtk`'s point/cell count stabilizing
-   over a long plateau is usable evidence that the mesh *topology* has
-   settled even without full point-position convergence.
+4. **Budget for a stall — and expect it, not just tolerate it.** Every
+   model attempted long enough has hit a multi-hour plateau in
+   `ProjectToIsoSurface` at some configuration: Bottle1's original input
+   (Finding 13, resolved — a genuine duplicate-triangle bug) and, this
+   session, three of Bunny's seven configurations, including its own best
+   reproduction (`rl4-halfshift-c145` plateaued on worst SJ for over an
+   hour after its mesh size had already converged). None of Bunny's cases
+   have a known input defect the way Bottle1's did, so four occurrences
+   across two models now looks like a general property of this
+   gradient-descent projection method rather than a per-model artifact —
+   still unexplained, but common enough to plan around rather than treat
+   as one-off. A `finalMesh.vtk` that never arrives, or one that arrives
+   but never ratchets further, isn't necessarily a dead end either way:
+   `projHex.vtk`'s point/cell count stabilizing over a long plateau is
+   usable evidence that the mesh *topology* has settled even without full
+   point-position convergence, and worst SJ never climbing doesn't affect
+   that topology at all.
 
 ## Summary log
 
