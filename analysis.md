@@ -113,7 +113,7 @@ directly comparable to it for that reason (see the [Bottle1 section](#bottle1-ge
 and its own pipeline-timings table, for the full breakdown and why this
 recipe's timing hasn't been the focus of this study). Config: `v1.0`
 source, input `f3247d8` (2024-01-16), `C_THRES` unchanged,
-`H_THRES = {32,16,8,4,2}`, `CELL_DETECT = 0.75`, four-tier `rl4` ladder
+`H_THRES = {32,16,8,4,2}`, `CELL_DETECT = 0.75`, four-level `rl4` configuration
 (`VOXEL_SIZE_VALUE=7`, `LADDER_TOP=octreeDepth`) — see [Finding 14](#finding-14) below for
 the full recipe and derivation.
 
@@ -145,9 +145,64 @@ internal stage timers (read + octree + dualization + buffer clearing,
 244.7 s) plus the wall-clock gap from buffer clearing to this run's
 `finalMesh.vtk` write (632 s). Config: `v1.0` source, `C_THRES =
 {0.2121, 0.4243, 0.8485, 1.45, 3.3941}`, `H_THRES = {11.3137, 5.6569,
-2.8284, 1.4142, 0.7071}`, `CELL_DETECT = 0.75`, four-tier `rl4` ladder
+2.8284, 1.4142, 0.7071}`, `CELL_DETECT = 0.75`, four-level `rl4` configuration
 (`VOXEL_SIZE_VALUE=7`, `LADDER_TOP=octreeDepth`) — see the [Bunny section](#bunny-genus-0)
 below for the full recipe and derivation.
+
+<a id="bunny-octree-levels"></a>
+**Which octree levels the Bunny actually uses.** Measured on
+`runs/bunny-v1.0-rl4-halfshift-c145/octree.vtk`, written after octree
+construction and before the clearing step.
+
+Read the levels below against one caveat: **this run uses our scheme, not
+the paper's.** It sets `LADDER_TOP = 7`, one level shallower than the
+paper's. The paper tests `l = 0 … 4` at levels 4-8 ("If an octree cell at
+level `l + 4` … we refine it to level `l + 5`"), so the paper's own
+initialized octree "ranges from level 5 to 9." This run tests `l = 0 … 4`
+at levels 3-7 instead. Every level below therefore sits one shallower than
+its paper counterpart — our level 3 is the paper's level 4. `bone`, the one
+model we reproduce byte-exactly with shipped defaults (`LADDER_TOP = 8`),
+occupies levels 5-8 and falls inside the paper's stated range; this Bunny
+run does not.
+
+| Octree level | Count (n) | Count (%) |
+|:---:|---:|---:|
+| 3 | 16 | 0.04% |
+| 4 | 2,160 | 5.07% |
+| 5 | 12,336 | 28.94% |
+| 6 | 15,440 | 36.22% |
+| 7 | 12,672 | 29.73% |
+| **total** | **42,624** | **100.00%** |
+
+Octree levels 0, 1, and 2 hold no leaves. Every cell at those levels is an
+ancestor of some cell that flagged for refinement. The octree therefore
+subdivides all of them.
+
+Level 3 behaves differently. Sixteen leaf cells survive refinement there.
+The clearing step removes them later, because they sit outside the
+boundary. A ray-parity test against this run's `modifiedTri.vtk` confirms
+it: all sixteen centroids fall outside the surface. They form two octree
+blocks in one corner, spanning x ∈ [50,100], y ∈ [0,25], z ∈ [75,100].
+Eight of them sit below the surface's own bounding box in y — centroid
+y = 6.25 against a surface minimum of 11.63. So clearing removes these
+sixteen cells, not refinement.
+
+The final mesh therefore draws its cells from octree levels 4 through 7.
+`finalMesh.vtk` does measure some cells deeper than level 7 — 492 at
+level 8, 5 at level 9, 1 at level 10. Those cannot be octree levels. The
+octree stops at level 7. They are projection distortion, cells whose
+edges shrank during the projection stage. This is the cleanest evidence
+yet for the distortion-tail reading used throughout this document, because
+the pre-projection octree supplies a hard ceiling that the final mesh
+cannot legitimately exceed.
+
+**"Refinement Level" is a misleading column name.** "Refinement span"
+describes the quantity better. The paper's phrasing invites confusion
+with an octree *level*. Read carelessly, Table 2's "4" looks like the
+Bunny's deepest octree level. It is not. The Bunny's deepest octree level
+is 7. The 4 counts how many levels the mesh spans — level 3 to level 7 in
+the octree, or levels 4 through 7 among the cells that survive clearing.
+Both readings give 4.
 
 ### 3. David (Genus-0)
 
@@ -190,8 +245,8 @@ internal stage timers (read + octree + dualization + buffer clearing,
 run's `finalMesh.vtk` write (~600 s, itself an approximation carried over
 from that same source). Config: `v1.0` source, `C_THRES = {0.21213203,
 0.42426407, 0.84852814, 1.69705627, 3.39411255}`, `H_THRES = {11.3137085,
-4.45, 2.6, 1.41421356, 0.70710678}`, `CELL_DETECT = 0.75`, four-tier
-`rl4` ladder (`VOXEL_SIZE_VALUE=8`, `LADDER_TOP=octreeDepth`) — see the
+4.45, 2.6, 1.41421356, 0.70710678}`, `CELL_DETECT = 0.75`, four-level
+`rl4` configuration (`VOXEL_SIZE_VALUE=8`, `LADDER_TOP=octreeDepth`) — see the
 [Bunny section](#bunny-genus-0) below for the full recipe and derivation.
 
 ### 6. Gargoyle (Genus-0)
@@ -239,7 +294,7 @@ internal stage timers (read + octree + dualization + buffer clearing,
 below) plus the wall-clock gap from buffer clearing to this run's
 `finalMesh.vtk` write (1,058 s). Config: `v1.0` source, `C_THRES =
 {0.15, 0.3, 2.0, 3.5, 2.4}`, `H_THRES = {16, 8, 4, 1.5, 1}`, `CELL_DETECT
-= 0.75`, four-tier `rl4` ladder (`VOXEL_SIZE_VALUE=8`,
+= 0.75`, four-level `rl4` configuration (`VOXEL_SIZE_VALUE=8`,
 `LADDER_TOP=octreeDepth`) — see the [Bunny section](#bunny-genus-0) below for the full
 recipe and derivation.
 
@@ -259,7 +314,7 @@ recipe and derivation.
 
 ## Bottle1 (Genus-1)
 
-| Metric | Tong et al. 2024 (Table 2) | 2026-08-04 (buggy `C_THRES`, capped) | 2026-08-05 (calibrated `C_THRES`, full budget) | 2026-08-17 (`v1.0`, 4 refinement tiers) |
+| Metric | Tong et al. 2024 (Table 2) | 2026-08-04 (buggy `C_THRES`, capped) | 2026-08-05 (calibrated `C_THRES`, full budget) | 2026-08-17 (`v1.0`, 4 refinement levels) |
 |---|---|---|---|---|
 | Vertices | 36,091 | 218,898 ⚠️ | 212,990 ⚠️ | **35,535** ✓ −1.5% |
 | Elements | 30,145 | 192,098 ⚠️ | 186,832 ⚠️ | **29,943** ✓ −0.7% |
@@ -273,9 +328,9 @@ Detailed log entry.** The 3.4x-to-6x oversizing that dominated the two
 earlier sessions was never a threshold-calibration problem. `v1.0`'s shipped
 constants are the paper's constants — they reproduce `our results/bone.vtk`
 *exactly*, down to identical cell connectivity — and Bottle1's real
-difference is that it was generated with **four** octree refinement tiers
+difference is that it was generated with **four** octree refinement thresholds
 rather than the five the public code hardcodes, exactly as Table 2's
-"Refinement Level 4" says. Running four tiers takes Bottle1 from 101,688
+"Refinement Level 4" says. Running four levels takes Bottle1 from 101,688
 elements to 29,943 against a target of 30,145 — and octree levels 6 and 7,
 which carry 93% of the mesh, match the reference to 0.5% and 0.1%
 (Findings [11](#finding-11) and [14](#finding-14)). The residual under 1% is not uniquely pinned by the
@@ -485,19 +540,19 @@ this file to avoid a merge conflict, then reconciled here.
 **Headline: the Bottle1 recipe ([Finding 14](#finding-14)) does not transfer.** Applying
 the exact configuration that reproduced Bottle1 to within 1.5%/0.7% —
 `v1.0` source, `C_THRES` unchanged, `H_THRES×2`, `CELL_DETECT=0.75`, the
-four-tier `rl4` ladder (`VOXEL_SIZE_VALUE=7`, `LADDER_TOP=octreeDepth`) —
+four-level `rl4` configuration (`VOXEL_SIZE_VALUE=7`, `LADDER_TOP=octreeDepth`) —
 against `bunny_tri.raw` overshoots by **70%** (43,691 / 36,901 vs. 26,375 /
 21,695). This is the direct "does the recipe transfer to an untuned model"
 test the previous session's "Where to go next" plan called for, and it
-fails: [Finding 10](#finding-10)'s claim that "Refinement Level" is the tier count, read
+fails: [Finding 10](#finding-10)'s claim that "Refinement Level" is the level count, read
 directly off the reference mesh, held up independently (Bunny's own
 octree-level histogram, measured fresh this session, confirms max real
-level 7 / 4 tiers — see below) — but [Finding 14](#finding-14)'s specific threshold
+level 7 / 4 levels — see below) — but [Finding 14](#finding-14)'s specific threshold
 *values* (`H_THRES×2`, `CELL_DETECT=0.75`) turn out to have been fitted to
 Bottle1 specifically, not universal.
 
-Six configurations were run, all `v1.0` source, all the four-tier `rl4`
-ladder (`VOXEL_SIZE_VALUE=7`, `LADDER_TOP=octreeDepth`) unless noted,
+Six configurations were run, all `v1.0` source, all the four-level `rl4`
+configuration (`VOXEL_SIZE_VALUE=7`, `LADDER_TOP=octreeDepth`) unless noted,
 against `bunny_tri.raw`:
 
 <a id="mesh-size-results-table"></a>
@@ -511,18 +566,18 @@ against `bunny_tri.raw`:
 | `rl4` (plain) | shipped | shipped | 1 (default) | 44,613 | 37,969 | +75% |
 | `rl4-h2x-cd75` (Bottle1's [Finding-14](#finding-14) recipe) | shipped | ×2 | 0.75 | 43,691 | 36,901 | +70% |
 | `rl4-h3` ([Finding-14](#finding-14)'s other lever) | shipped | `H[3]: 2→3` | 1 (default) | 46,282 | 39,420 | +82% |
-| `vs8abs` (tests whether Bunny needs a 5th tier) | shipped | shipped | 1 (default), `VOXEL_SIZE_VALUE=8` | 145,049 | 126,800 | +484% |
+| `vs8abs` (tests whether Bunny needs a fifth level) | shipped | shipped | 1 (default), `VOXEL_SIZE_VALUE=8` | 145,049 | 126,800 | +484% |
 
 The family is cleanly monotonic in how tightly the thresholds constrain
 refinement (`shift1` tightest → `h3` loosest), which is itself useful: the
 true per-model configuration for Bunny sits between `rl4-halfshift-cd75`
 and `rl4-cd75`, i.e. somewhere between a `√2` and a `1×` scale-relative
 correction, refined further by `rl4-halfshift-c145` above. `vs8abs`
-(`VOXEL_SIZE_VALUE=8`, the shipped 5-tier ladder) massively overshoots
+(`VOXEL_SIZE_VALUE=8`, the shipped five-threshold configuration) massively overshoots
 (+484%), confirming Bunny's reference-mesh level-8 population (2.3% of the
-mesh) is projection distortion, not real fifth-tier refinement — the same
+mesh) is projection distortion, not real fifth-level refinement — the same
 conclusion [Finding 11](#finding-11) reached for Bottle1, now independently replicated on
-a second model via a real (not just inferred) fifth-tier run.
+a second model via a real (not just inferred) fifth-level run.
 
 ² **Important calibration point, discovered mid-session**: the dual-mesh
 point/cell count *before* projection (`dualHex.vtk`, written at the
@@ -546,8 +601,7 @@ strong evidence the *topology* (element splits) had already settled even
 though point-position convergence hadn't, so these are reported as
 confirmed rather than provisional, on that basis.
 
-³ To close Bunny's residual gap: at `rl4-halfshift-cd75` thresholds, tier
-3 (level 6→7) was confirmed purely curvature-gated (31 curvature
+³ To close Bunny's residual gap: at `rl4-halfshift-cd75` thresholds, threshold 3 (level 6→7) was confirmed purely curvature-gated (31 curvature
 candidates via `refine_criteria_stats`, 0 thickness candidates), so
 `C_THRES[3]` alone was swept from 1.6971 down toward 1.2 via
 `refine_criteria_stats` (candidate counts 31→41→49→61→74→78 at
@@ -557,12 +611,12 @@ on the first try, landing within +3.8% without needing a second
 iteration. `finalMesh.vtk` was written and `projHex.vtk`'s topology
 confirmed stable well past that point.
 
-**The diagnostic that made this tractable: refined-parent counts per tier,
+**The diagnostic that made this tractable: refined-parent counts per level,
 not totals.** A level-`(L+1)` population of `N` cells implies `N/8`
 refined level-`L` parent cells; recursing this upward from each mesh's
-leaves gives a per-tier count directly comparable to the reference's:
+leaves gives a per-level count directly comparable to the reference's:
 
-| Config | parents @ tier 0 (level 3) | @ tier 1 (level 4) | @ tier 2 (level 5) | @ tier 3 (level 6) |
+| Config | parents @ threshold 0 (level 3) | @ threshold 1 (level 4) | @ threshold 2 (level 5) | @ threshold 3 (level 6) |
 |---|---|---|---|---|
 | **reference (`bunny.vtk`)** | **129** | **832** | **1,233** | **870** |
 | `rl4` (plain) | 129 | 963 | 2,328 | 1,907 |
@@ -572,18 +626,18 @@ leaves gives a per-tier count directly comparable to the reference's:
 | `rl4-shift1-cd75` | 137 | 686 | 637 | 234 |
 | `rl4-halfshift-cd75` | 136 | 815 | 1,155 | 695 |
 
-Tier 0 is geometry-bound (128–137 across every config, reference 129), so
+Threshold 0 is geometry-bound (128–137 across every config, reference 129), so
 it carries no information — the octree's coarsest refine-or-not decision
 doesn't depend on these thresholds. The signal is that every plain-`rl4`-
-family config's error *roughly doubles with each deeper tier* (tier 1
-+15–19%, tier 2 +65–89%, tier 3 +87–144%) — the signature of a per-tier
+family config's error *roughly doubles with each deeper threshold* (threshold 1
++15–19%, threshold 2 +65–89%, threshold 3 +87–144%) — the signature of a per-level
 *geometric scaling* problem, not a single bad threshold. That's why neither
 [Finding 14](#finding-14) lever (`H×2` alone, or `H[3]: 2→3` alone) fixes it: each
-perturbs one tier while the error compounds across all of them.
+perturbs one threshold while the error compounds across all of them.
 `rl4-halfshift-cd75` (`C_THRES×√2`, `H_THRES÷√2` — a *half*-level
 scale-relative correction, as opposed to `rl4-shift1-cd75`'s full-level
-one) comes far closer at every tier (−2% / −6% / −20% at tiers 1/2/3), and
-loosening tier 3's gate further (`rl4-halfshift-c145`, above) closes the
+one) comes far closer at every threshold (−2% / −6% / −20% at thresholds 1/2/3), and
+loosening threshold 3's gate further (`rl4-halfshift-c145`, above) closes the
 remaining gap to +3.0%/+3.8% — the best Bunny reproduction reached this
 session.
 
@@ -592,18 +646,18 @@ trusted by filename.** Every `build-variants/` binary used here was
 recompiled from source with the CMake Release flags
 (`-O3 -DNDEBUG -std=c++17 -arch arm64`) and compared byte-for-byte against
 the shipped binary; only the Mach-O UUID and a few symbol-table bytes
-differ. Confirms `HexGen-rl4-h3` is `H_THRES = {16,8,4,3,1}` (only tier
+differ. Confirms `HexGen-rl4-h3` is `H_THRES = {16,8,4,3,1}` (only threshold
 index 3 bumped, 2→3 — not `{16,8,4,2,3}` as its name alone might suggest),
 `HexGen-rl4-h2x-cd75` is `H_THRES = {32,16,8,4,2}` at `CELL_DETECT = 0.75`,
-and `HexGen-rl4` is the shipped arrays unchanged at the four-tier ladder.
+and `HexGen-rl4` is the shipped arrays unchanged at the four-level configuration.
 
-**Octree-level histogram — confirms [Finding 10](#finding-10)'s tier count, flags a
+**Octree-level histogram — confirms [Finding 10](#finding-10)'s level count, flags a
 measurement-methodology gap.** Measuring `our results/bunny.vtk` directly
 (edge length → level, model rescaled into a 100-unit cube) gives level 4:
 312 (1.4%), 5: 5,321 (24.5%), 6: 8,634 (39.8%), 7: 6,931 (32.0%), 8: 494
 (2.3%, almost certainly the same projection-distortion artifact [Finding 11](#finding-11)
 identified for Bottle1's level-8 population, not real refinement), 9–10: 3
-cells (noise) — confirming max real level 7, four tiers, independently of
+cells (noise) — confirming max real level 7, four levels, independently of
 [Finding 10](#finding-10)'s own table. However, this measurement used **mean of the pair
 of points spanning one edge** as the length proxy, which does not match
 what reproduces `analysis.md`'s own previously-published per-model counts
@@ -620,14 +674,14 @@ measurement in this file should use the 12-edge-mean metric**, not a
 single-edge proxy.
 
 **Derived ladder settings for the remaining Table 2 models.** From the
-tier-index/level relationship in `ComputeCellValue()` (`HexGen.cpp:1015`,
-tier `i` sits at level `ladderTop - 4 + i`) and the scale-relative
+threshold-index/level relationship in `ComputeCellValue()` (`HexGen.cpp:1015`,
+threshold `i` sits at level `ladderTop - 4 + i`) and the scale-relative
 structure [Finding 12](#finding-12) identified (`H_THRES[i] = 2.56 × cellsize` at the
-shipped ladder position, tier 0 assumed at level 4): `VOXEL_SIZE_VALUE` =
+shipped ladder position, threshold 0 assumed at level 4): `VOXEL_SIZE_VALUE` =
 each model's own deepest real octree level (measured off its reference
 mesh, 12-edge-mean metric); `LADDER_TOP = octreeDepth` for Table 2's
 "refinement level 4" models, `(octreeDepth - 1)` for "level 5" models, and
-"level 6" (David only) needs `v1.2`'s still-commented-out sixth tier. The
+"level 6" (David only) needs `v1.2`'s still-commented-out sixth threshold. The
 scale-relative `H_THRES` multiplier is `2^(4 - (ladderTop - 4))`:
 
 | Model | Table 2 refinement level | Deepest real level | `VOXEL_SIZE_VALUE` | `LADDER_TOP` | scale-relative `H_THRES` multiplier |
@@ -636,7 +690,7 @@ scale-relative `H_THRES` multiplier is `2^(4 - (ladderTop - 4))`:
 | Dragon Stand2, Gargoyle, Lion Recon, Ramses, Thai Statue | 4 | 8 | 8 | `octreeDepth` | ×1 (shipped) |
 | Head, Deformed Armadillo | 5 | 8 | 8 | `(octreeDepth - 1)` | ×2 |
 | Oil Pump | 5 | 9 | 9 | `(octreeDepth - 1)` | ×1 (= stock `v1.0` ladder) |
-| David | 6 | 9 | 9 | needs the 6th tier | — |
+| David | 6 | 9 | 9 | needs the sixth threshold | — |
 | `bone` (control, not in Table 2) | — | 9 | 9 | `(octreeDepth - 1)` | ×1 |
 
 `bone`'s row falls straight out of this rule as *exactly* the shipped
@@ -645,13 +699,17 @@ model this repo reproduces byte-exactly. Its own level histogram
 (`level_histogram.py`: level 5-9 at 9.72%/43.75%/31.13%/14.80%/0.59%)
 shows the same signature as every other model's distortion tail — level
 9's 51 cells are a ~25× drop from level 8, not a smooth continuation — so
-`bone` is 5 real tiers (levels 4-8), consistent with the shipped
-`LADDER_TOP=8` setting it happens to reproduce exactly. A naive "any cells
-present" read would have misclassified level 9 as a real sixth tier; the
+`bone` occupies levels 5-8 — four real levels. (An earlier version of this
+paragraph said "5 real levels (levels 4-8)", which contradicts the very
+histogram quoted above it; corrected 2026-08-27, see [Finding
+10](#finding-10)'s correction note. `bone` compiles in all five thresholds
+under `LADDER_TOP=8`, but its geometry never fires the deepest one, so the
+mesh spans four levels, not five.) A naive "any cells
+present" read would have misclassified level 9 as a real sixth threshold; the
 relative-magnitude test (is the deepest population a small fraction with
 a sharp drop, or a smooth continuation of the level above) is what
 resolves it correctly here — the same test that resolves David's
-sixth-tier question below.
+sixth-threshold question below.
 
 **A methodological caveat worth stating precisely, not glossing over.**
 This single-reference-mesh "small fraction + sharp drop" test is weaker
@@ -673,17 +731,17 @@ constraint — would produce the same small-fraction-with-a-sharp-drop
 signature without being any kind of artifact at all. For the practical
 purpose this table serves (what `VOXEL_SIZE_VALUE`/`LADDER_TOP` should a
 model use), the distinction doesn't matter — either mechanism means that
-level doesn't need its own explicit tier, and `bone`'s case settles it
-independently of which explanation is right: its shipped 5-tier
+level doesn't need its own explicit threshold, and `bone`'s case settles it
+independently of which explanation is right: its shipped five-threshold
 configuration reproduces `our results/bone.vtk` byte-for-byte, level-9
 population included, so whatever produces those 51 cells is already
 present in the *correct* configuration, not evidence of a missing sixth
-tier. But readers relying on this table for anything beyond ladder-depth
+threshold. But readers relying on this table for anything beyond ladder-depth
 selection should know the two tests differ in strength, and that this
 session ran the weaker one seven more times below without re-running
 [Finding 11](#finding-11)'s stronger comparative version on any of them.
 
-**David's sixth-tier question, reconciled** (checked directly with
+**David's sixth-threshold question, reconciled** (checked directly with
 `level_histogram.py`, not reasoned about abstractly): `david.vtk`'s full
 distribution is level 4: 0.02%, 5: 1.74%, 6: 9.52%, 7: 26.14%, 8: 41.11%,
 **9: 20.77%**, 10: 0.71%. Level 9 is not a thin tail by any reading of the
@@ -692,7 +750,7 @@ the mesh, a smooth continuation of the level 4→8 climb, not a sudden drop.
 Level 10 (0.71%, a 29× drop from level 9) is the actual distortion tail,
 matching the same small-fraction signature seen on every other model's
 deepest population. So [Finding 9](#finding-9) and [Finding 10](#finding-10) were never really in
-conflict — David does need a genuine sixth tier (levels 4-9), Table 2's
+conflict — David does need a genuine sixth threshold (levels 4-9), Table 2's
 "Refinement Level 6" is literal, and the commented-out
 `//if (level == 9) {// 5` block in `v1.2`/`v1.3` is exactly what's needed
 to reach it. What looked like tension was an artifact of stating the
@@ -722,7 +780,7 @@ relative-magnitude test used above:
 
 ¹ Oil Pump is the one borderline case: level 9 (7.24%) is a smaller,
 7.5× drop from level 8 rather than the 15-100× drops seen everywhere
-else, which is a real tier's signature, not a tail's — level 10 (0.07%,
+else, which is a real level's signature, not a tail's — level 10 (0.07%,
 a further 103× drop from level 9) is unambiguously the tail instead. This
 is exactly what the ladder-derivation table already predicted (Oil Pump
 needs the stock `v1.0` ladder, `VOXEL_SIZE_VALUE=9`,
@@ -734,7 +792,7 @@ Combined with Bottle1 ([Finding 10](#finding-10)/[11](#finding-11)), Bunny, Drag
 (this session, via real runs), every ladder-position prediction in the
 table above now has direct reference-mesh support — eleven of Table 2's
 twelve models (David is the twelfth, resolved separately above as
-needing its own sixth tier). None of this required running the pipeline;
+needing its own sixth threshold). None of this required running the pipeline;
 it's a `level_histogram.py` call against an existing file for each
 model, seconds of compute total. What's still unvalidated by an actual
 run is *only* the eight models never actually built and run this
@@ -748,7 +806,7 @@ Stand2, and Ramses did.
 `rl4-halfshift-cd75`'s 1.6971 to 1.45 (`runs/bunny-v1.0-rl4-halfshift-c145/`,
 otherwise identical: `C_THRES = {0.2121, 0.4243, 0.8485, 1.45, 3.3941}`,
 `H_THRES = {11.3137, 5.6569, 2.8284, 1.4142, 0.7071}`, `CELL_DETECT = 0.75`,
-four-tier `rl4` ladder) converged cleanly — `finalMesh.vtk` written, mesh
+four-level `rl4` configuration) converged cleanly — `finalMesh.vtk` written, mesh
 topology stable in `projHex.vtk` well past that point:
 
 | | Reproduction | Table 2 target |
@@ -762,7 +820,7 @@ This is closer than Bottle1's own best reproduction (−1.5%/−0.7%, but in
 the opposite direction — Bunny overshoots slightly where Bottle1
 undershot slightly), reached by a symmetric method: start from the other
 model's recipe, recognize it doesn't transfer, find the scale-relative
-correction that brackets the target, then nudge the one tier that's
+correction that brackets the target, then nudge the one threshold that's
 purely curvature-gated. `C_THRES[3]` between 1.45 and 1.6971 would
 presumably narrow the remaining ~3% further, but wasn't pursued past this
 point — Bottle1's own experience ([Finding 14](#finding-14)) is that the last few percent
@@ -877,7 +935,7 @@ converged to **117,793 / 98,666** against Table 2's **62,576 / 50,853** —
 an **88% / 94% overshoot**, the same order of magnitude and direction as
 Bunny's shipped-threshold attempts (+70-82%) despite Dragon Stand2 sitting
 at a different rung of the ladder (`VOXEL_SIZE_VALUE=8` vs. Bunny/Bottle1's
-7). The ladder-position prediction held — this wasn't a five-tier-style
+7). The ladder-position prediction held — this wasn't a five-threshold-style
 catastrophic failure, "only" roughly double — but the threshold values
 once again needed their own fit, a third independent confirmation of the
 synthesis above.
@@ -889,11 +947,11 @@ something that changes how every future model in this table should be
 fitted — see [Finding 15](#finding-15) immediately below for the full mechanism. Final
 recipe: `VOXEL_SIZE_VALUE=8`, `LADDER_TOP=octreeDepth` (unchanged from
 the baseline), `C_THRES` = shipped `×√2` (the same "half-level" scale
-correction that helped Bunny), `H_THRES` = shipped `÷√2` at tiers 0, 3,
-4, but tiers 1 and 2 tightened further to `4.45` (from `5.657`) and `2.6`
+correction that helped Bunny), `H_THRES` = shipped `÷√2` at thresholds 0, 3,
+4, but thresholds 1 and 2 tightened further to `4.45` (from `5.657`) and `2.6`
 (from `2.828`), `CELL_DETECT = 0.75`. Reached in six full runs (the first
 four working out the coupling rule itself, the last two a mechanical
-per-tier fit once the rule was known):
+per-level fit once the rule was known):
 
 | | Reproduction | Table 2 target |
 |---|---|---|
@@ -902,9 +960,9 @@ per-tier fit once the rule was known):
 | vs. target | **−0.43% / −0.49%** | — |
 | Refinement level | 4 | 4 |
 
-Per-tier refined-parent counts: 1,855.8 / 2,967.3 / 1,898.7 against the
+Per-level refined-parent counts: 1,855.8 / 2,967.3 / 1,898.7 against the
 reference's 1,833.1 / 2,981.9 / 1,952.0 — **+1.2% / −0.5% / −2.7%**, every
-tier inside 3%, against the shipped baseline's +25% / +91% / +182%. Worst
+threshold inside 3%, against the shipped baseline's +25% / +91% / +182%. Worst
 SJ stalled at the initial 0.01 gate across every run that reached
 projection (the same phenomenon documented for Bunny, now an eighth
 occurrence across four models) — no effect on mesh size or topology.
@@ -915,54 +973,54 @@ the segfault below) is in `dragonstand2-scratch.md` at the repo root, not
 folded in here in full — this is the load-bearing summary.
 
 <a id="finding-15"></a>
-### Finding 15 — the five refinement tiers are not independent knobs, and the asymmetry is exact, not approximate
+### Finding 15 — the five refinement thresholds are not independent knobs, and the asymmetry is exact, not approximate
 
 The single most useful discovery of the whole Dragon Stand2 fit, and it
 changes the recommended fitting procedure for every model after this one.
-`ComputeCellValue()` (`HexGen.cpp:1017`) tests a cell's own tier gate only
+`ComputeCellValue()` (`HexGen.cpp:1017`) tests a cell's own threshold gate only
 as a *fallback*: for any cell above the deepest level, it first checks
 all eight children and marks the cell `intersect = true` if **any** child
 intersects, only falling through to the cell's own `C_THRES`/`H_THRES`
 box test when none do. Two consequences follow, both confirmed
 experimentally, not just read off the source:
 
-- **Tightening tier `t`'s threshold affects tier `t` and nothing
+- **Tightening threshold `t` affects threshold `t` and nothing
   shallower.** A cell that now fails its own (tightened) test provably
   had no refining children either — if it had, the child check would
   already have marked it `intersect` before its own test ever ran. So
   tightening can only delete cells that were already leaves at that
   level, never anything shallower. Verified exactly: tightening
-  `H_THRES[1]` alone (run 3 vs. run 1) left tiers 2 and 3's octree parent
+  `H_THRES[1]` alone (run 3 vs. run 1) left thresholds 2 and 3's octree parent
   counts bit-identical — not approximately equal, identical to the
-  integer — while tier 1 moved by −4.5%.
-- **Loosening tier `t`'s threshold propagates upward to every shallower
-  tier**, because a newly-intersecting deep cell now marks its parent
+  integer — while threshold 1 moved by −4.5%.
+- **Loosening threshold `t` propagates upward to every shallower
+  threshold**, because a newly-intersecting deep cell now marks its parent
   (and grandparent, ...) `intersect = true` too, through the same
-  child-check path. Measured directly: loosening tier 3 by +22%
-  (candidate count) pulled tier 2's octree parent count up +6.8% and
-  tier 1 up slightly, with *tier 2's own threshold completely
-  unchanged*. A first attempt that read tier 3 as "9% too tight" in
+  child-check path. Measured directly: loosening threshold 3 by +22%
+  (candidate count) pulled threshold 2's octree parent count up +6.8% and
+  threshold 1 up slightly, with *threshold 2's own value completely
+  unchanged*. A first attempt that read threshold 3 as "9% too tight" in
   isolation and loosened it accordingly went the wrong way entirely —
-  the propagated increase at tiers 1-2 more than cancelled the intended
-  tier-1 tightening it was paired with, and the run had to be killed at
+  the propagated increase at thresholds 1-2 more than cancelled the intended
+  threshold-1 tightening it was paired with, and the run had to be killed at
   the octree stage as a known regression.
 
-**This makes per-tier fitting mechanical instead of a search.** Read the
-reference mesh's refined-parent counts per tier
-(`level_histogram.py --parents`), then tighten each tier's own `C_THRES`/
+**This makes per-level fitting mechanical instead of a search.** Read the
+reference mesh's refined-parent counts per level
+(`level_histogram.py --parents`), then tighten each threshold's own `C_THRES`/
 `H_THRES` — working in any order, since tightening never pollutes another
-tier — until each tier's parent count matches, using `refine_criteria_stats`
+threshold — until each threshold's parent count matches, using `refine_criteria_stats`
 to sweep threshold values cheaply before committing to full runs. Never
-loosen a tier relative to a baseline that already overshoots everywhere,
-since a loosening's effect on shallower tiers is real but not confidently
+loosen a threshold relative to a baseline that already overshoots everywhere,
+since a loosening's effect on shallower thresholds is real but not confidently
 predictable in advance (the failed first attempt didn't get the direction
 of the *net* effect wrong, only its magnitude, but that was enough to
 invert the outcome). This retroactively explains why Bunny's own
-`C_THRES[3]` fit (a single-tier loosening) worked cleanly on the first
-try [above](#best-bunny-reproduction-reached): tier 3 was Bunny's *deepest* tier, with
-nothing below it to propagate from — loosening the deepest tier is always
-safe, by the same logic that makes tightening any tier always safe. The
-risk is specific to loosening a tier that has tiers beneath it, which
+`C_THRES[3]` fit (a single-threshold loosening) worked cleanly on the first
+try [above](#best-bunny-reproduction-reached): threshold 3 was Bunny's *deepest* threshold, with
+nothing below it to propagate from — loosening the deepest threshold is always
+safe, by the same logic that makes tightening any threshold always safe. The
+risk is specific to loosening a threshold that has thresholds beneath it, which
 neither Bottle1's nor Bunny's fits ever needed to do.
 
 A second, smaller finding from the same session: `refine_criteria_stats`
@@ -975,14 +1033,14 @@ of a search on a model with at least one full run already done, not a
 transferable constant to predict a config's outcome from
 `refine_criteria_stats` alone with zero full runs. Related: `octree.vtk`
 (written right after octree construction, hours before a full run
-finishes) is an excellent *projection-free* early read on each tier's
+finishes) is an excellent *projection-free* early read on each threshold's
 relative shape, but the octree→final-mesh "survival ratio" — how many
 octree-stage parents survive into the final mesh's parent count — drifts
 with configuration (Dragon Stand2's projection inflation factor was
 `×1.580` for the shipped run and `×1.726` for the first fitted attempt),
 so using `octree.vtk` alone to predict a config's *absolute* final size
 ran consistently ~10% low here. Once two full runs of the same model
-exist, fitting `total_cells = a + b·(sum of per-tier parents)` linearly
+exist, fitting `total_cells = a + b·(sum of per-level parents)` linearly
 across just those two points predicted both a third run's outcome and —
 more tellingly — the reference mesh's own total from its own parent sum,
 to within 0.5%.
@@ -1017,36 +1075,36 @@ really is per-model, not even per-ladder-rung. Not pursued to a fit yet —
 its ~3.6-hour pipeline, by far the slowest of any model run, made even
 one exploratory full run an expensive commitment, but [Finding 15](#finding-15) (Dragon
 Stand2's session, below) turns that from a search into a mechanical
-per-tier match against `refine_criteria_stats` and the reference's own
+per-level match against `refine_criteria_stats` and the reference's own
 refined-parent counts, which should make Ramses considerably cheaper to
 fit than Dragon Stand2 was, despite its slower pipeline per attempt —
 fewer attempts should be needed.
 
 **Ramses fitting, applying [Finding 15](#finding-15) directly — round 2 result: +3.4%/+4.0%,
-Ramses' best reproduction.** Per-tier
+Ramses' best reproduction.** Per-level
 parent-count ratios (shipped-baseline `finalMesh.vtk` vs. reference,
-using the `level6<-5`/`level7<-6`/`level8<-7`/`level9<-8` tier mapping
+using the `level6<-5`/`level7<-6`/`level8<-7`/`level9<-8` threshold mapping
 established for this ladder rung) showed a far more lopsided mismatch
-than Dragon Stand2's: tier1 (level 5→6) only +13% over, tier2 (level
-6→7) **+217%**, tier3 (level 7→8) **+3,065%** — by a wide margin the most
-extreme single-tier overshoot found this session, concentrated almost
-entirely in curvature (`refine_criteria_stats` shows tier2/tier3
+than Dragon Stand2's: threshold 1 (level 5→6) only +13% over, threshold 2 (level
+6→7) **+217%**, threshold 3 (level 7→8) **+3,065%** — by a wide margin the most
+extreme single-threshold overshoot found this session, concentrated almost
+entirely in curvature (`refine_criteria_stats` shows threshold 2/threshold 3
 candidate counts barely move under `H_THRES` sweeps but drop sharply
 under `C_THRES` sweeps). Round 1 (`C_THRES = {0.15, 0.3, 1.0, 2.2, 2.4}`,
-`H_THRES` shipped, `CELL_DETECT = 0.75`, tiers 2 and 3 tightened, tier 1
+`H_THRES` shipped, `CELL_DETECT = 0.75`, thresholds 2 and 3 tightened, threshold 1
 left alone) converged to **104,067 / 90,483** against the 44,790 / 37,993
 target — **+132% / +138%**, a large improvement on the shipped baseline's
 +448%/+473% but still far off. Its octree stage ran in 31.8 minutes
 (1,905.6 s), a 6x speedup from the shipped baseline's 190.3 minutes —
 consistent with the tighter-thresholds-build-cheaper-octrees pattern
-holding here too. Per-tier parent ratios after round 1: tier1 now close
+holding here too. Per-level parent ratios after round 1: threshold 1 now close
 (1.11x reference — leave alone, per [Finding 15](#finding-15)'s tighten-only rule),
-tier2 still 2.22x over, tier3 still 6.92x over. Tier3's curvature
+threshold 2 still 2.22x over, threshold 3 still 6.92x over. Threshold 3's curvature
 candidates alone bottom out around a thickness-driven floor (~108-135
 regardless of how tight `C_THRES[3]` goes), so closing the remaining gap
 needed tightening `H_THRES[3]` as well, not `C_THRES[3]` alone — round 2
 (`C_THRES = {0.15, 0.3, 2.0, 3.5, 2.4}`, `H_THRES = {16, 8, 4, 1.5, 1}`,
-`CELL_DETECT` unchanged) tested both tiers tightened together.
+`CELL_DETECT` unchanged) tested both thresholds tightened together.
 
 **Round 2 result.** Octree construction dropped again, to 7.7 minutes
 (463.6 s) — 24.6x faster than the shipped baseline, 4.1x faster than
@@ -1067,12 +1125,12 @@ independent property of the mesh):
 | Best SJ | 1.000000 | 1.0 |
 | Refinement level | 4 | 4 |
 
-Per-tier refined-parent counts: 1,635.4 / 3,016.1 / 692.6 against the
+Per-level refined-parent counts: 1,635.4 / 3,016.1 / 692.6 against the
 reference's 1,589.6 / 2,935.5 / 609.7 — **+2.9% / +2.7% / +13.6%**
-(tier3's percentage looks large but is a small absolute count, 83 cells).
+(threshold 3's percentage looks large but is a small absolute count, 83 cells).
 Comparable in quality to Bunny's own best reproduction (+3.0%/+3.8%),
 reached in two rounds rather than Dragon Stand2's six — consistent with
-[Finding 15](#finding-15)'s prediction that the mechanical per-tier procedure would need
+[Finding 15](#finding-15)'s prediction that the mechanical per-level procedure would need
 fewer attempts than the trial-and-error process that discovered it, even
 starting from a far more severe shipped-threshold mismatch (+448% vs.
 Dragon Stand2's +88%). Final configuration: `C_THRES = {0.15, 0.3, 2.0,
@@ -1103,7 +1161,7 @@ operator chose to stop each one).
 | `bunny-v1.0-rl4` (plain) | 1.43 s | 430.2 s | 54.5 s | 89.6 s | 1,277 s (~21.3 min) | 575.7 s |
 | `bunny-v1.0-rl4-h2x-cd75` | 1.39 s | 410.7 s | 51.9 s | 83.9 s | 7,283 s (~121.4 min) | 547.9 s |
 | `bunny-v1.0-rl4-h3` | 1.40 s | 471.7 s | 58.2 s | 91.6 s | 451 s (~7.5 min) | 622.9 s |
-| `bunny-v1.0-vs8abs` (5-tier control) | 1.44 s | 4,083.1 s (~68.1 min) | 531.1 s | 405.7 s | 2,498 s (~41.6 min) | 5,021.3 s |
+| `bunny-v1.0-vs8abs` (five-threshold control) | 1.44 s | 4,083.1 s (~68.1 min) | 531.1 s | 405.7 s | 2,498 s (~41.6 min) | 5,021.3 s |
 | `dragonstand2-v1.0-vs8` | 10.2 s | 3,893.2 s (~64.9 min) | 587.2 s | 806.0 s | 1,149 s (~19.2 min) | 5,296.6 s |
 | `ramses-v1.0-vs8` | 2.0 s | 11,420.9 s (~190.3 min) | 1,435.9 s (~23.9 min) | 1,029.6 s (~17.2 min) | 1,059 s (~17.7 min) | 12,889.4 s (~214.8 min) |
 | `dragonstand2-v1.0-halfshift-cd75-h1h26` (fitted, run 6 of 6) | ~10 s | 1,486 s (~24.8 min) | 175 s | 439 s | ~600 s (~10 min)¹ | 2,110 s (~35.2 min) |
@@ -1163,10 +1221,10 @@ across different models' shipped baselines.
    reaching the convergence gate but stabilized in `projHex.vtk`'s
    point/cell count well before being stopped, so those two counts are
    trusted on that basis rather than from a clean write. Also ran a real
-   `vs8abs` (five-tier, shipped `VOXEL_SIZE_VALUE=8`) test rather than
+   `vs8abs` (five-threshold, shipped `VOXEL_SIZE_VALUE=8`) test rather than
    just inferring from the reference mesh — massively overshoots (+484%),
    independently confirming Bunny's level-8 population is distortion, not
-   a real fifth tier.
+   a real fifth threshold.
 2. **The decisive cross-model test — answered, negatively, within this
    same session.** `runs/bottle1-v1.0-rl4-halfshift-cd75/` (input
    `f3247d8`, the header-correct file from [Finding 13](#finding-13)) was built and run
@@ -1188,13 +1246,13 @@ across different models' shipped baselines.
    reproduction reached" above.
 4. **Dragon Stand2 — fitted to −0.43%/−0.49%, the best reproduction of
    any Table 2 model to date.** See "[Finding 15](#finding-15)" and the results table
-   above. Along the way, found the tier-independence rule that turns
+   above. Along the way, found the threshold-independence rule that turns
    every future model's threshold fit from a search into a mechanical
-   per-tier match.
+   per-level match.
 5. **Ramses — fitted to +3.4%/+4.0%, in two rounds.** See the results
    table above. Started from the most severe shipped-threshold mismatch
    of any model this session (+448%/+473%, driven almost entirely by one
-   tier's curvature gate) and reached a result comparable to Bunny's own
+   threshold's curvature gate) and reached a result comparable to Bunny's own
    best in a fraction of the attempts Dragon Stand2 needed — direct
    evidence that [Finding 15](#finding-15)'s mechanical procedure generalizes and pays
    off, not just a one-off success on the model that discovered it.
@@ -1205,7 +1263,7 @@ across different models' shipped baselines.
    Pump, David), per the ladder-derivation table above, all have their
    ladder position already confirmed against their own reference mesh at
    zero compute cost (see the full-table check above), so resuming should
-   go straight to [Finding 15](#finding-15)'s mechanical per-tier fit for each, without
+   go straight to [Finding 15](#finding-15)'s mechanical per-level fit for each, without
    re-deriving anything already established here.
 7. **The worst-SJ/convergence-stall phenomenon** (nine occurrences across
    four models now — Ramses round 1 stalled at the initial gate too,
@@ -1262,7 +1320,7 @@ side is more informative than any one of them alone.
 |---|---|---|---|
 | Genus | 0 | 1 | 0 |
 | Table 2 refinement level | — (not in Table 2) | 4 | 4 |
-| Ladder needed | shipped defaults, unmodified | `VOXEL_SIZE_VALUE=7`, `LADDER_TOP=octreeDepth` (4 tiers) | same as Bottle1 |
+| Ladder needed | shipped defaults, unmodified | `VOXEL_SIZE_VALUE=7`, `LADDER_TOP=octreeDepth` (4 levels) | same as Bottle1 |
 | `C_THRES` needed | shipped, unmodified | shipped, unmodified | needs its own scale correction — shipped is far too loose |
 | `H_THRES` needed | shipped, unmodified | shipped, ×2 | between ×1 and ×√2 (own correction, still being narrowed) |
 | `CELL_DETECT` needed | shipped (1), unmodified | 0.75 | 0.75 (borrowed from Bottle1 — untested whether it's even right) |
@@ -1273,9 +1331,9 @@ Level" is a real, measurable, model-invariant property — the depth of the
 octree ladder — not a tuning knob.** It was first read off Bottle1's
 reference mesh by measuring cell edge lengths ([Finding 10](#finding-10)), then confirmed
 the same way on Bunny at the start of this session, and now confirmed a
-third, stronger way on both models: actually *running* the wrong tier
+third, stronger way on both models: actually *running* the wrong threshold
 count rather than just inferring it from the reference. Bottle1 at five
-tiers overshoots 3.4x ([Finding 11](#finding-11)); Bunny at five tiers overshoots 5.8x
+thresholds overshoots 3.4x ([Finding 11](#finding-11)); Bunny at five thresholds overshoots 5.8x
 (`vs8abs`, this session). Both failures are catastrophic and in the same
 direction, which is exactly what a genuinely model-invariant setting
 predicts when it's set wrong. `bone` fits the same picture from the other
@@ -1335,7 +1393,7 @@ across all three:**
    has been right on every model checked so far and is cheap to get
    right — an octree-only run, without waiting for projection, is enough
    to confirm it (as `vs8abs` did for Bunny).
-2. **Don't assume a distortion tail is a real tier.** A small
+2. **Don't assume a distortion tail is a real level.** A small
    (2-4%), spatially diffuse population at one level deeper than the main
    mass of the mesh has now been seen — and confirmed as an artifact, not
    real refinement — on both Bottle1 ([Finding 11](#finding-11), statistical/spatial
@@ -1347,17 +1405,17 @@ across all three:**
    `refine_criteria_stats` sweeps candidate counts in single-digit
    seconds, versus the 5-190+ minute octree stage alone for a full run —
    use it to narrow the threshold search before committing to an
-   expensive end-to-end run. The per-tier refined-parent-count diagnostic
-   (recursing a level's leaf count upward, `N/8` per tier, and comparing
-   tier-by-tier against the reference) is sharper than comparing mesh
-   totals, because it localizes *which* tier is off rather than just *how
+   expensive end-to-end run. The per-level refined-parent-count diagnostic
+   (recursing a level's leaf count upward, `N/8` per level, and comparing
+   level-by-level against the reference) is sharper than comparing mesh
+   totals, because it localizes *which* threshold is off rather than just *how
    much* — and, per [Finding 15](#finding-15) (Dragon Stand2's session), that
-   per-tier comparison isn't just a diagnostic, it's the fit itself:
-   tightening a tier's own threshold affects that tier exactly and
-   nothing shallower, so matching each tier's parent count to the
+   per-level comparison isn't just a diagnostic, it's the fit itself:
+   tightening one threshold affects that threshold exactly and
+   nothing shallower, so matching each threshold's parent count to the
    reference, working in any order but only ever tightening, converges
    mechanically rather than by trial and error. The one thing to avoid is
-   loosening a tier that has tiers beneath it — that propagates upward
+   loosening a threshold that has thresholds beneath it — that propagates upward
    unpredictably in magnitude (though always in the same direction) and
    can invert an otherwise-correct adjustment elsewhere.
 4. **Budget for a stall — and expect it, not just tolerate it.** Every
@@ -1393,9 +1451,9 @@ across all three:**
 | 2026-07-02 – 2026-07-03 | M4 | Got this fork building on macOS, then found and fixed a genuine upstream bug — `ProjectToIsoSurface()` had an infinite loop with no exit path, an unbounded quality-ratchet, and a convergence tolerance borrowed from an unrelated check. Fixed and verified against `bone`, the smallest sample model. Separately, this is also where the sibling `HexOpt` repo's own gap was first found (its public code doesn't implement the AL/L-BFGS/ReHQJ method its paper claims). |
 | 2026-08-04 | M1 | Cloned the fork here, cleaned up ~600K lines of build cruft the M4 session had accidentally committed, and ran the first Bottle1 reproduction attempt. Result: a mesh ~6x too large and a worst scaled Jacobian far below Table 2's — the size gap unexplained at the time, the quality gap eventually traced to a deliberately reduced iteration budget. |
 | 2026-08-05 | M1 | Root-caused the mesh-size gap to two separate issues — the shipped curvature thresholds didn't match the paper's stated values, and (independently) this codebase's curvature *formula* doesn't match the paper's stated formula either.<br><br>Recalibrated empirically using `bone` as a fast testbed, which fixed `bone`'s mesh size well and got Bottle1's convergence *quality* to match closely — but Bottle1's mesh size and, especially, its runtime (~27x slower than `bone` even fully calibrated) remained largely unmoved.<br><br>Spent most of the day testing *why*, testing four hypotheses for the over-refinement:<ul><li>`C_THRES` alone — tested and refuted</li><li>`H_THRES` alone — tested and refuted</li><li>octree-balancing propagation — tested and refuted</li><li>spatial dispersion of refinement candidates — real but insufficient effect</li></ul>Also traced a related finding in the sibling `HexOpt` repo: its restored optimizer code looks structurally like `HybridOctree_Hex`'s own older algorithm, not the CAD 2026 paper's claimed method, backed by a definitive date-based proof (see `hovey/HexOpt`'s README). |
-| 2026-08-17 | M1 | Switched strategy from threshold-guessing to git archaeology. Found that the repo's `/our results/bottle1.vtk`, committed by the paper's first author Tong one day before the `v1.0` tag and never touched since, reproduces Table 2's Bottle1 numbers **exactly** (36,091 verts / 30,145 elems / worst SJ 0.560000 / best SJ 1.0, via `scaled_jacobian_stats`) — strong evidence it's the actual paper output file, not just a close match.<br><br>Statically diffed source across every upstream tag (`v1.0`→`v1.1`→`v1.2`→`v1.3`→current `HEAD`) and found the 2026-08-05 calibration work had anchored `C_THRES` to `v1.2`'s values — but `v1.0`/`v1.1`'s own original constants (`C_THRES={0.15,0.3,0.6,1.2,2.4}`, `VOXEL_SIZE=9`), the closest available source snapshot in time to the reference mesh, had never been tried.<br><br>Built and ran both `v1.0` and `v1.1` against the recovered original 2024-01-11 input surface. Both got permanently stuck at the same point in the final projection stage (never reached Table 2's numbers), which reframed the investigation: not a `v1.0`-vs-`v1.1` code-version question after all, but something about specific local geometry in Bottle1's input surface that this gradient-descent projection method can't resolve regardless of version.<br><br>Along the way, corrected two initial misreadings (see Detailed log for the full trail): `c291245` (2024-01-11, used for today's runs) has an off-by-one header bug that makes `ReadRawData()` silently duplicate its last triangle, while `f3247d8` (2024-01-16) parses cleanly; and `v1.1`'s new code block turned out to be a post-convergence step, not stuck-recovery logic, so it never actually ran in either attempt — the real cause of `v1.0`/`v1.1`'s differing exploration patterns is still open. `v1.1` left running as a low-priority background check; next step is a targeted dump of the local triangle neighborhood around the stuck point.<br><br>**Later the same day, both open questions closed.** Instead of dumping the triangle neighborhood, switched to measuring octree levels directly off the meshes — every model is rescaled into a fixed 100-unit cube, so a hex's edge length *is* its octree cell size and its level is just `log2(100/edge)`. That turned the whole problem from inference into measurement.<br><br>Three results followed. (1) `v1.0`'s shipped constants are the paper's constants: run unmodified on `bone` they reproduce `our results/bone.vtk` **exactly** — 10,356 / 8,619 / 0.610001 / 1.0, with byte-identical cell connectivity — so every earlier session's threshold calibration was solving a problem that did not exist. (2) Bottle1's reference mesh sits exactly on the committed input surface (max boundary deviation 0.00000), so the input was never the variable either; the one remaining variable is how deep the octree refines, and Table 2's "Refinement Level" column turns out to report exactly that — the number of active refinement tiers, verified against every Table 2 model's reference mesh. Bottle1 used **four** tiers where the public code hardcodes five, which alone accounts for the entire 3.4x oversizing: 101,688 elements → 27,750. (3) The all-day projection stalls were caused by `c291245`'s duplicated triangle — a controlled same-config comparison has `c291245` frozen forever at `smallDist=1.399` while `f3247d8` converges cleanly — so the header-correct file is the one to reproduce against, reversing this morning's choice.<br><br>Best configuration reached: 35,535 verts / 29,943 elems against 36,091 / 30,145 (−1.5% / −0.7%), with octree levels 6 and 7 — 93% of the mesh — matching to 0.5% and 0.1%. The last ~1% is not uniquely pinned by the evidence, and probably cannot be: the reference mesh predates the first committed source by a day. |
-| 2026-08-18 | M1 | Moved to Bunny, run as two parallel independent efforts (a Sonnet session plus a background Opus agent) to test whether Bottle1's [Finding-14](#finding-14) recipe transfers to a model it wasn't tuned on. It doesn't: applied as-is, it overshoots Bunny by 70% (43,691/36,901 vs. 26,375/21,695). Six threshold configurations tried, all confirmed by session's end (two via a clean `finalMesh.vtk`, two via a stabilized `projHex.vtk` after 2+ hour plateaus, matching a stuck-point pattern [Finding 13](#finding-13) first saw on Bottle1); the family is cleanly monotonic in threshold tightness. Devised a sharper diagnostic — refined-parent counts per octree tier rather than mesh totals — which shows the error compounding roughly 2× per tier across every plain-`rl4`-family config, the signature of a scaling problem rather than a single bad threshold. Derived and tabulated `VOXEL_SIZE`/`LADDER_TOP` settings for all remaining Table 2 models from the ladder-position/level relationship. Caught a methodology bug from the session's own early hours: `dualHex.vtk`'s point/cell count (pre-projection) is not a safe stand-in for `finalMesh.vtk`'s (post-projection can add 40-50% more elements by splitting low-quality ones). Cross-validated the best candidate (a `√2` "half-level" scale correction) against Bottle1 directly: it undershoots by 45%, the opposite direction from Bunny's overshoot under Bottle1's own recipe — a decisive negative result, settling that **the thresholds are genuinely per-model, not one universal rule**, while the ladder-depth ("Refinement Level") reading keeps holding up on every model. Closed Bunny's own gap anyway by tuning one purely-curvature-gated tier (`C_THRES[3]`: 1.6971→1.45), reaching **27,175/22,525 vs. 26,375/21,695 (+3.0%/+3.8%)** on the first attempt — Bunny's best reproduction, comparable to Bottle1's own (−1.5%/−0.7%, opposite direction). Ran Dragon Stand2 as a third-model check (different ladder rung, `VOXEL_SIZE_VALUE=8`): ladder position held, thresholds again didn't transfer (+88%/+94%), a third independent confirmation. Closed with a cross-cutting synthesis section on what `bone`/Bottle1/Bunny collectively show, and a practical four-step recipe for future models. |
-| 2026-08-19 | M1 | Formalized the level-histogram methodology as a real tool, `scripts/level_histogram.py` (12-edge-mean metric, plus the per-tier refined-parent-count diagnostic), replacing the one-off code from the day before. Used it to resolve two open questions cleanly: `bone`'s level-9 population (0.59%, a ~25x drop from level 8) and David's level-10 population (0.71%, a 29x drop from level 9) are both genuine distortion tails, while David's level-9 population (20.77%, the *second-largest* band in the mesh) is real — so David does need six tiers as Table 2 claims, and the "open reconciliation" between Findings [9](#finding-9) and [10](#finding-10) noted the day before was an artifact of applying the distortion-tail heuristic too loosely; checked against five models now (`bone`, Bottle1, Bunny, Dragon Stand2, David) without a miscall. Ran Ramses as a fourth-model ladder-position check (same rung as Dragon Stand2, `VOXEL_SIZE_VALUE=8`): ladder held, but the shipped-threshold mismatch was far more severe than any other model — +448%/+473% overshoot, a ~3.6-hour pipeline (its octree stage alone, 190 minutes, is the slowest single stage measured this session, on a *smaller* input than Dragon Stand2's), traced to a 4.3x-oversized pre-projection octree. Two same-ladder-rung models (Dragon Stand2, Ramses) landing five times further apart from each other than either is from its own target further rules out a per-rung correction shortcut. Added a full pipeline-timings table across every Bunny/Dragon Stand2/Ramses run. A background Opus agent worked Dragon Stand2's threshold fit in parallel throughout, using `refine_criteria_stats` sweeps and its own full-run tests, and landed the session's best result: **62,307/50,603 vs. 62,576/50,853 (−0.43%/−0.49%)**, beating Bottle1's previous best. Along the way it found **[Finding 15](#finding-15)**: the five refinement tiers are coupled one-directionally — tightening a tier's threshold changes that tier only, exactly, while loosening one propagates upward to every shallower tier — which turns future threshold-fitting from a search into a mechanical per-tier match against the reference's refined-parent counts. Applied that procedure directly to Ramses (the most severe shipped-threshold mismatch found this session, +448%/+473%, concentrated almost entirely in one tier's curvature gate) and reached **46,329/39,529 vs. 44,790/37,993 (+3.4%/+4.0%, worst SJ 0.570 vs. Table 2's 0.590)** in two rounds — far fewer than Dragon Stand2's six, direct evidence the procedure generalizes. Paused model reproduction at this point (five models done: `bone`, Bottle1, Bunny, Dragon Stand2, Ramses) at the user's request, to shift toward writing this material into the `automesh` mdbook's Section 8 (Hexahedral Meshing from a Surface). |
+| 2026-08-17 | M1 | Switched strategy from threshold-guessing to git archaeology. Found that the repo's `/our results/bottle1.vtk`, committed by the paper's first author Tong one day before the `v1.0` tag and never touched since, reproduces Table 2's Bottle1 numbers **exactly** (36,091 verts / 30,145 elems / worst SJ 0.560000 / best SJ 1.0, via `scaled_jacobian_stats`) — strong evidence it's the actual paper output file, not just a close match.<br><br>Statically diffed source across every upstream tag (`v1.0`→`v1.1`→`v1.2`→`v1.3`→current `HEAD`) and found the 2026-08-05 calibration work had anchored `C_THRES` to `v1.2`'s values — but `v1.0`/`v1.1`'s own original constants (`C_THRES={0.15,0.3,0.6,1.2,2.4}`, `VOXEL_SIZE=9`), the closest available source snapshot in time to the reference mesh, had never been tried.<br><br>Built and ran both `v1.0` and `v1.1` against the recovered original 2024-01-11 input surface. Both got permanently stuck at the same point in the final projection stage (never reached Table 2's numbers), which reframed the investigation: not a `v1.0`-vs-`v1.1` code-version question after all, but something about specific local geometry in Bottle1's input surface that this gradient-descent projection method can't resolve regardless of version.<br><br>Along the way, corrected two initial misreadings (see Detailed log for the full trail): `c291245` (2024-01-11, used for today's runs) has an off-by-one header bug that makes `ReadRawData()` silently duplicate its last triangle, while `f3247d8` (2024-01-16) parses cleanly; and `v1.1`'s new code block turned out to be a post-convergence step, not stuck-recovery logic, so it never actually ran in either attempt — the real cause of `v1.0`/`v1.1`'s differing exploration patterns is still open. `v1.1` left running as a low-priority background check; next step is a targeted dump of the local triangle neighborhood around the stuck point.<br><br>**Later the same day, both open questions closed.** Instead of dumping the triangle neighborhood, switched to measuring octree levels directly off the meshes — every model is rescaled into a fixed 100-unit cube, so a hex's edge length *is* its octree cell size and its level is just `log2(100/edge)`. That turned the whole problem from inference into measurement.<br><br>Three results followed. (1) `v1.0`'s shipped constants are the paper's constants: run unmodified on `bone` they reproduce `our results/bone.vtk` **exactly** — 10,356 / 8,619 / 0.610001 / 1.0, with byte-identical cell connectivity — so every earlier session's threshold calibration was solving a problem that did not exist. (2) Bottle1's reference mesh sits exactly on the committed input surface (max boundary deviation 0.00000), so the input was never the variable either; the one remaining variable is how deep the octree refines, and Table 2's "Refinement Level" column turns out to report exactly that — the number of active refinement thresholds, verified against every Table 2 model's reference mesh. Bottle1 used **four** thresholds where the public code hardcodes five, which alone accounts for the entire 3.4x oversizing: 101,688 elements → 27,750. (3) The all-day projection stalls were caused by `c291245`'s duplicated triangle — a controlled same-config comparison has `c291245` frozen forever at `smallDist=1.399` while `f3247d8` converges cleanly — so the header-correct file is the one to reproduce against, reversing this morning's choice.<br><br>Best configuration reached: 35,535 verts / 29,943 elems against 36,091 / 30,145 (−1.5% / −0.7%), with octree levels 6 and 7 — 93% of the mesh — matching to 0.5% and 0.1%. The last ~1% is not uniquely pinned by the evidence, and probably cannot be: the reference mesh predates the first committed source by a day. |
+| 2026-08-18 | M1 | Moved to Bunny, run as two parallel independent efforts (a Sonnet session plus a background Opus agent) to test whether Bottle1's [Finding-14](#finding-14) recipe transfers to a model it wasn't tuned on. It doesn't: applied as-is, it overshoots Bunny by 70% (43,691/36,901 vs. 26,375/21,695). Six threshold configurations tried, all confirmed by session's end (two via a clean `finalMesh.vtk`, two via a stabilized `projHex.vtk` after 2+ hour plateaus, matching a stuck-point pattern [Finding 13](#finding-13) first saw on Bottle1); the family is cleanly monotonic in threshold tightness. Devised a sharper diagnostic — refined-parent counts per octree threshold rather than mesh totals — which shows the error compounding roughly 2× per level across every plain-`rl4`-family config, the signature of a scaling problem rather than a single bad threshold. Derived and tabulated `VOXEL_SIZE`/`LADDER_TOP` settings for all remaining Table 2 models from the ladder-position/level relationship. Caught a methodology bug from the session's own early hours: `dualHex.vtk`'s point/cell count (pre-projection) is not a safe stand-in for `finalMesh.vtk`'s (post-projection can add 40-50% more elements by splitting low-quality ones). Cross-validated the best candidate (a `√2` "half-level" scale correction) against Bottle1 directly: it undershoots by 45%, the opposite direction from Bunny's overshoot under Bottle1's own recipe — a decisive negative result, settling that **the thresholds are genuinely per-model, not one universal rule**, while the ladder-depth ("Refinement Level") reading keeps holding up on every model. Closed Bunny's own gap anyway by tuning one purely-curvature-gated threshold (`C_THRES[3]`: 1.6971→1.45), reaching **27,175/22,525 vs. 26,375/21,695 (+3.0%/+3.8%)** on the first attempt — Bunny's best reproduction, comparable to Bottle1's own (−1.5%/−0.7%, opposite direction). Ran Dragon Stand2 as a third-model check (different ladder rung, `VOXEL_SIZE_VALUE=8`): ladder position held, thresholds again didn't transfer (+88%/+94%), a third independent confirmation. Closed with a cross-cutting synthesis section on what `bone`/Bottle1/Bunny collectively show, and a practical four-step recipe for future models. |
+| 2026-08-19 | M1 | Formalized the level-histogram methodology as a real tool, `scripts/level_histogram.py` (12-edge-mean metric, plus the per-level refined-parent-count diagnostic), replacing the one-off code from the day before. Used it to resolve two open questions cleanly: `bone`'s level-9 population (0.59%, a ~25x drop from level 8) and David's level-10 population (0.71%, a 29x drop from level 9) are both genuine distortion tails, while David's level-9 population (20.77%, the *second-largest* band in the mesh) is real — so David does need six levels as Table 2 claims, and the "open reconciliation" between Findings [9](#finding-9) and [10](#finding-10) noted the day before was an artifact of applying the distortion-tail heuristic too loosely; checked against five models now (`bone`, Bottle1, Bunny, Dragon Stand2, David) without a miscall. Ran Ramses as a fourth-model ladder-position check (same rung as Dragon Stand2, `VOXEL_SIZE_VALUE=8`): ladder held, but the shipped-threshold mismatch was far more severe than any other model — +448%/+473% overshoot, a ~3.6-hour pipeline (its octree stage alone, 190 minutes, is the slowest single stage measured this session, on a *smaller* input than Dragon Stand2's), traced to a 4.3x-oversized pre-projection octree. Two same-ladder-rung models (Dragon Stand2, Ramses) landing five times further apart from each other than either is from its own target further rules out a per-rung correction shortcut. Added a full pipeline-timings table across every Bunny/Dragon Stand2/Ramses run. A background Opus agent worked Dragon Stand2's threshold fit in parallel throughout, using `refine_criteria_stats` sweeps and its own full-run tests, and landed the session's best result: **62,307/50,603 vs. 62,576/50,853 (−0.43%/−0.49%)**, beating Bottle1's previous best. Along the way it found **[Finding 15](#finding-15)**: the five refinement thresholds are coupled one-directionally — tightening one threshold changes that threshold only, exactly, while loosening one propagates upward to every shallower threshold — which turns future threshold-fitting from a search into a mechanical per-level match against the reference's refined-parent counts. Applied that procedure directly to Ramses (the most severe shipped-threshold mismatch found this session, +448%/+473%, concentrated almost entirely in one threshold's curvature gate) and reached **46,329/39,529 vs. 44,790/37,993 (+3.4%/+4.0%, worst SJ 0.570 vs. Table 2's 0.590)** in two rounds — far fewer than Dragon Stand2's six, direct evidence the procedure generalizes. Paused model reproduction at this point (five models done: `bone`, Bottle1, Bunny, Dragon Stand2, Ramses) at the user's request, to shift toward writing this material into the `automesh` mdbook's Section 8 (Hexahedral Meshing from a Surface). |
 
 ## Detailed log
 
@@ -1902,7 +1960,7 @@ list sizes for any `C_THRES`/`H_THRES`, in ~9 s for Bottle1. That skips the
 ~36-minute `ComputeCellValue()` octree sweep entirely, so thresholds can be
 swept in seconds instead of half-hours. Bottle1 at `v1.0`'s own values:
 
-| Tier | Octree level | Curvature pts | Curvature tris | Thickness pts | Thickness tris | Union pts | Union tris |
+| Threshold | Octree level | Curvature pts | Curvature tris | Thickness pts | Thickness tris | Union pts | Union tris |
 |---|---|---|---|---|---|---|---|
 | 0 | 4 | 2,073 | 6,426 | 4,638 | 10,488 | 5,500 | 14,124 |
 | 1 | 5 | 1,256 | 4,381 | 1,602 | 2,921 | 2,508 | 6,659 |
@@ -1911,8 +1969,8 @@ swept in seconds instead of half-hours. Bottle1 at `v1.0`'s own values:
 | 4 | 8 | 12 | 59 | 0 | 0 | 12 | 59 |
 
 Bottle1's curvature `r[]` has median 0.017 and 99th percentile 1.16, so the
-deep tiers are driven by a very small tail of high-curvature vertices —
-138 points at tier 3 and 12 at tier 4 — which nonetheless cascade into 43,968
+deep thresholds are driven by a very small tail of high-curvature vertices —
+138 points at threshold 3 and 12 at threshold 4 — which nonetheless cascade into 43,968
 level-8 and 12,554 level-9 elements, because `CELL_DETECT = 1` doubles each
 cell's detection box and `RefineBrothers()` refines all eight siblings of any
 flagged cell.
@@ -1964,20 +2022,20 @@ Bottle1 row: **how deep the octree is allowed to refine.**
 
 <a id="finding-9"></a>**Finding 9 — the refinement ladder is a per-model knob, and Table 2's
 "Refinement Level" column reports it.** `ComputeCellValue()` hardcodes its
-five refinement tiers at octree levels 8, 7, 6, 5, 4 with "refine all" at
+five refinement thresholds at octree levels 8, 7, 6, 5, 4 with "refine all" at
 level 3, and `VOXEL_SIZE = 9` caps the tree at level 9. Two pieces of
 evidence say that ladder was not fixed across the paper's runs:
 
-- `v1.2`/`v1.3` still carry a **commented-out sixth tier**,
+- `v1.2`/`v1.3` still carry a **commented-out sixth threshold**,
   `//if (level == 9) {// 5`, and `v1.2`'s first commit (`2e5f4c0`) shipped a
   six-entry `C_THRES = {0.1, 0.2, 0.4, 0.8, 1.6, 3.2}` alongside a
-  `levelRes[]` extended to 1024 and `VOXEL_SIZE = 10`. A sixth tier at level 9
+  `levelRes[]` extended to 1024 and `VOXEL_SIZE = 10`. A sixth threshold at level 9
   produces level-10 cells.
 - Measuring the reference meshes confirms different models bottom out at
   different levels: `bunny` (Table 2 refinement level 4) stops at level 8,
   `bottle1` (4) at level 8, `deformed_armadillo` (5) and `head` (5) at level
   9, `david` (6) at level 10 — and `david.vtk` really does contain 1,997
-  cells at size 0.0977 = 100/1024, which the public five-tier code physically
+  cells at size 0.0977 = 100/1024, which the public five-threshold code physically
   cannot produce.
 
 So the shipped source is one frozen snapshot of a ladder the author moved per
@@ -1997,37 +2055,111 @@ with `-DLADDER_TOP="(octreeDepth - 1)"` at `VOXEL_SIZE = 9`
 (`runs/bone-v1.0-vs9rel/`) also lands on 10,356 / 8,619 / 0.610001 / 1.0,
 confirming the refactor is a no-op at the shipped setting.
 
-<a id="finding-10"></a>**Finding 10 — Table 2's "Refinement Level" column is the number of active
-refinement tiers, readable off every reference mesh.** With levels now
-measurable directly ([Finding 5b](#finding-5b)), each Table 2 model's reference mesh was
-checked for its minimum and maximum genuinely-occupied octree level. In the
-shipped code the ladder runs "refine all" at level `L`, then five tiers at
-`L+1 ... L+5`, so the number of tiers equals `maxLevel - minLevel`:
+<a id="finding-10"></a>**Finding 10 — Table 2's "Refinement Level" column is the number of
+distinct octree levels the mesh occupies, readable off every reference
+mesh.** With levels now measurable directly ([Finding 5b](#finding-5b)),
+every Table 2 reference mesh was measured for the octree levels it
+genuinely occupies.
 
-| Model | Table 2 Refinement Level | Min level in reference | Max level in reference | `max - min` |
+| Model | Table 2 Refinement Level | Real levels occupied | Distinct count | `max - min` |
 |---|---|---|---|---|
-| Bottle1 | 4 | 3 (all refined away; 51 leaves at 4) | 7 | 4 |
-| Bunny | 4 | 3 (204 leaves at 4) | 7 | 4 |
-| Dragon Stand2 | 4 | 4 (none survive; 735 leaves at 5) | 8 | 4 |
-| Gargoyle | 4 | 4 (368 leaves at 5) | 8 | 4 |
-| Deformed Armadillo | 5 | 3 | 8 | 5 |
-| Head | 5 | 3 | 8 | 5 |
-| David | 6 | 3 | 9 | 6 |
-| `bone` (not in Table 2) | — | 4 | 9 | 5 = the shipped setting |
+| Bottle1 | 4 | 4-7 | **4** ✓ | 3 |
+| Bunny | 4 | 4-7 | **4** ✓ | 3 |
+| Dragon Stand2 | 4 | 5-8 | **4** ✓ | 3 |
+| Gargoyle | 4 | 5-8 | **4** ✓ | 3 |
+| Deformed Armadillo | 5 | 4-8 | **5** ✓ | 4 |
+| Head | 5 | 4-8 | **5** ✓ | 4 |
+| David | 6 | 4-9 | **6** ✓ | 5 |
+| `bone` (not in Table 2) | — | 5-8 | 4 | 3 |
 
-Every row is consistent. `david` reaching level 9 (and showing cells at
-100/1024 = 0.0977) is only possible with a sixth tier — precisely the
-`//if (level == 9) {// 5` block still sitting commented out in `v1.2`/`v1.3`.
-And `bone`, the one model we reproduce exactly, is exactly the model whose
-setting the public code happens to be frozen at.
+The **distinct count** column reproduces Table 2 exactly on all seven
+models. `max - min` does not — it falls short by one on every row.
 
-<a id="finding-11"></a>**Finding 11 — running Bottle1 at four tiers closes almost the whole gap.**
+<a id="how-real-levels-were-obtained"></a>**How the "real levels" column was
+obtained.** Three steps, all reproducible from files in this repo.
+
+*Step 1 — why an edge length is a level.* `ReadRawData()`
+(`HexGen.cpp:817-832`) rescales every input surface into a fixed 100-unit
+cube: it takes the model's longest dimension as `BOX_LENGTH`, centres the
+model on the other two axes, then multiplies every vertex by
+`100.0 / BOX_LENGTH`. Physical units are discarded. An octree cell at level
+`L` therefore has edge `100 / 2^L` in every model, and a hex's level is
+just `log2(100 / edge)`.
+
+*Step 2 — measure.* `scripts/level_histogram.py` computes each hex's edge as
+the mean of its 12 edges, converts to a level, and rounds:
+
+```
+python3 scripts/level_histogram.py "our results/<model>.vtk"
+```
+
+Run on all eight reference meshes (counts, then percentage of that mesh):
+
+| Model | L4 | L5 | L6 | L7 | L8 | L9 | L10 |
+|---|---|---|---|---|---|---|---|
+| Bottle1 | 52 (0.17%) | 1,015 (3.37%) | 9,945 (32.99%) | 18,122 (60.12%) | 1,006 (3.34%) | 5 (0.02%) | — |
+| Bunny | 204 (0.94%) | 5,423 (25.00%) | 9,000 (41.48%) | 6,960 (32.08%) | 108 (0.50%) | — | — |
+| Dragon Stand2 | — | 735 (1.45%) | 11,683 (22.97%) | 21,903 (43.07%) | 15,485 (30.45%) | 1,047 (2.06%) | — |
+| Gargoyle | — | 368 (0.16%) | 17,487 (7.39%) | 154,546 (65.29%) | 60,646 (25.62%) | 3,642 (1.54%) | — |
+| Deformed Armadillo | 14 (0.04%) | 2,153 (6.16%) | 7,808 (22.35%) | 9,088 (26.01%) | 15,081 (43.16%) | 795 (2.28%) | — |
+| Head | 237 (0.43%) | 5,058 (9.19%) | 14,158 (25.72%) | 27,474 (49.92%) | 7,867 (14.29%) | 244 (0.44%) | — |
+| David | 60 (0.02%) | 4,922 (1.74%) | 26,938 (9.52%) | 73,964 (26.14%) | 116,317 (41.11%) | 58,759 (20.77%) | 1,997 (0.71%) |
+| `bone` | — | 838 (9.72%) | 3,771 (43.75%) | 2,683 (31.13%) | 1,276 (14.80%) | 51 (0.59%) | — |
+
+*Step 3 — discard the distortion tail.* The deepest band in most meshes is
+not a real octree level. The projection stage moves boundary vertices onto
+the input surface, which shrinks some hexes enough to measure a level
+deeper than the octree ever built. The test, settled in the 2026-08-19
+session and applied without a miscall across all eight models: **a
+population an order of magnitude or more below the band above it is
+distortion; a smooth continuation is real.** Applying it drops Bottle1's
+L8+L9 (18,122 → 1,006, an 18× fall), Bunny's L8 (6,960 → 108, 64×), Dragon
+Stand2's L9 (15,485 → 1,047, 15×), Gargoyle's L9 (60,646 → 3,642, 17×),
+Deformed Armadillo's L9 (15,081 → 795, 19×), Head's L9 (7,867 → 244, 32×),
+David's L10 (58,759 → 1,997, 29×), and `bone`'s L9 (1,276 → 51, 25×).
+David's L9 survives the test — 58,759 cells against L8's 116,317 is a
+factor of 2, not a decade — which is why David alone needs a sixth
+threshold.
+
+The Bunny run in [its own section](#bunny-octree-levels) supplies an
+independent check on step 3. Its `octree.vtk`, written before projection,
+contains no cell deeper than level 7, while its `finalMesh.vtk` measures
+492 cells at level 8, 5 at level 9, and 1 at level 10. The octree itself
+provides a hard ceiling, so those deeper measurements can only be
+distortion. That is direct confirmation of the heuristic rather than an
+appeal to it.
+
+<a id="finding-10-correction"></a>**Correction, 2026-08-27.** An earlier
+version of this finding stated the rule as `max - min`, and its table
+listed a "min level in reference" one level below the measured minimum on
+every row. That figure was an inferred octree minimum, not a measurement,
+and the inference was circular: it assumed the answer in order to make the
+subtraction come out right. Counting occupied levels directly needs no
+inference and lands on the same numbers. Two smaller errors went with it —
+Bottle1's shallowest population is 52 cells, not 51, and `bone`'s minimum
+is level 5, not level 4.
+
+That correction also changes how `bone` reads. `bone` occupies levels 5-8,
+four distinct levels, even though it runs the shipped configuration with
+all five thresholds compiled in. A threshold being available is not the
+same as a threshold firing: `bone`'s geometry never triggers the deepest
+one, so the mesh spans four levels rather than five. The earlier claim that
+`bone` demonstrates "5 = the shipped setting" does not survive measurement.
+What `bone` does still demonstrate is that the shipped constants are the
+paper's constants ([Finding 7](#finding-7)).
+
+`david` reaching level 9 as a genuine population (20.77%, the second-largest
+band in its mesh, and showing cells at 100/1024 = 0.0977) is only possible
+with a sixth threshold — precisely the `//if (level == 9) {// 5` block still
+sitting commented out in `v1.2`/`v1.3`.
+
+<a id="finding-11"></a>**Finding 11 — running Bottle1 at four levels closes almost the whole gap.**
 Three Bottle1 configurations, all `v1.0` code with `v1.0`'s own
 `C_THRES = {0.15, 0.3, 0.6, 1.2, 2.4}` and `H_THRES = {16,8,4,2,1}`
 untouched, differing only in where the ladder sits and how deep the tree may
 go. All against the 2024-01-11 input (`c291245`) unless noted:
 
-| Configuration | Tiers (octree levels) | Max level | Octree cells | Octree time | Final points | Final cells |
+| Configuration | Levels (octree levels) | Max level | Octree cells | Octree time | Final points | Final cells |
 |---|---|---|---|---|---|---|
 | shipped (`bottle1-v1.0-repro`) | 5, at 4-8 | 9 | 173,552 | 2,168 s | 117,031 | 101,688 |
 | `vs8rel` | 5, at 3-7 | 8 | 65,024 | 321 s | 40,781 | 34,653 |
@@ -2067,7 +2199,7 @@ makes two coincident triangles share all three edges, so the dihedral angle
 between them is 0 and each of their three vertices picks up
 `(0 - PI)^2 = 9.8696` of curvature. Confirmed by `refine_criteria_stats`: the
 curvature maximum is exactly 9.8696 for `c291245` and 3.7410 for `f3247d8`,
-and the deepest tier's candidate lists shrink from 12 points / 59 triangles to
+and the deepest threshold's candidate lists shrink from 12 points / 59 triangles to
 9 / 47. Both files' geometry is identical; the bug just injects three phantom
 high-curvature vertices. The reference mesh was generated on 2024-01-11 with
 that bug present, and reproducing it means keeping it.
@@ -2076,20 +2208,20 @@ that bug present, and reproducing it means keeping it.
 level 7 and 295 long at level 6 — which is one consistent story, since
 refining one level-6 cell trades it for eight level-7 cells. The reference
 refined roughly 230-290 more level-6 cells than we do, about 11% more. That
-is a small, single-tier discrepancy in the tier gated by `C_THRES[3] = 1.2`
+is a small, single-threshold discrepancy in the threshold gated by `C_THRES[3] = 1.2`
 and `H_THRES[3] = 2`.
 
-<a id="finding-12"></a>**Finding 12 — the residual gap is the deepest tier's *thickness* gate, and
+<a id="finding-12"></a>**Finding 12 — the residual gap is the deepest threshold's *thickness* gate, and
 the target falls between two natural values.** Both threshold arrays are
 really one scale-relative rule: at their shipped levels `H_THRES[i]` is
 exactly `2.56 x cellsize` and `C_THRES[i]` exactly `0.9375 / cellsize`, for
 every `i`. Shifting the ladder one level coarser while keeping the arrays
-indexed by tier therefore halves each thickness threshold relative to its
-tier's cell, and doubles each curvature threshold. Testing that, plus
+indexed by threshold therefore halves each thickness threshold relative to its
+own cell, and doubles each curvature threshold. Testing that, plus
 `OUT_IN_RATIO` (which `v1.3` raises to 0.15) as a control — all at the `rl4`
 ladder, all against `c291245`:
 
-| Deepest tier's gate | Final points | Final cells | vs. target |
+| Deepest threshold's gate | Final points | Final cells | vs. target |
 |---|---|---|---|
 | `H[3] = 2` (`rl4`, thickness array shifted with the ladder) | 33,787 | 28,484 | −5.5% |
 | `H[3] = 2`, `OUT_IN_RATIO = 0.15` | 33,989 | 28,668 | −4.9% |
@@ -2145,7 +2277,7 @@ a stopping point, not a property of the mesh.)
 
 <a id="finding-14"></a>**Finding 14 — closing the last percent: restore the scale-relative
 thickness rule and use the author's own `CELL_DETECT = 0.75`.** The
-shifted ladder halves every thickness threshold relative to its tier's cell
+shifted ladder halves every thickness threshold relative to its own cell
 size, so the natural correction is to double `H_THRES` to `{32,16,8,4,2}`,
 which restores `H_THRES[i] = 2.56 x cellsize` exactly. On its own that
 overshoots ([Finding 12](#finding-12)), but combined with `CELL_DETECT = 0.75` — the value
@@ -2198,7 +2330,7 @@ configuration, all of it `v1.0` source with no algorithmic change:
 - `H_THRES = {32, 16, 8, 4, 2}` — `v1.0`'s own, doubled to keep
   `H_THRES[i] = 2.56 x cellsize` under the shifted ladder
 - `CELL_DETECT = 0.75`
-- four refinement tiers at octree levels 3-6, maximum level 7 — built as
+- four refinement thresholds at octree levels 3-6, maximum level 7 — built as
   `-DVOXEL_SIZE_VALUE=7 -DLADDER_TOP=octreeDepth`
 - run `ProjectToIsoSurface` until `ELEM_THRES` reaches 0.56 and stop, exactly
   as the unbounded `while (true)` loop forces a human operator to do — this
@@ -2216,7 +2348,7 @@ against Table 2's Bottle1 row:
 | Best SJ | 1.000000 | 1.000000 |
 | Refinement level | 4 | 4 |
 
-Honest accounting of what is derived versus fitted: the four-tier ladder is
+Honest accounting of what is derived versus fitted: the four-level configuration is
 *derived* — it is what Table 2's own "Refinement Level" column says, it is
 confirmed independently by every other model's reference mesh ([Finding 10](#finding-10)),
 and it alone accounts for the factor of 3.4. `H_THRES x 2` is *derived* from
@@ -2235,10 +2367,10 @@ next step is breadth rather than more depth on Bottle1:
 
 1. **Run the remaining eleven Table 2 models.** Each one's refinement level is
    already read off its reference mesh ([Finding 10](#finding-10)), so each is a single run
-   with a known ladder setting rather than a search. Bunny (4 tiers), Dragon
-   Stand2 and Gargoyle (4 tiers, ladder one level finer — their references
+   with a known ladder setting rather than a search. Bunny (4 levels), Dragon
+   Stand2 and Gargoyle (4 levels, ladder one level finer — their references
    have no level-4 cells), Head and Deformed Armadillo (5), David (6, needs
-   the sixth tier that `v1.2` left commented out). Confirming the recipe
+   the sixth threshold that `v1.2` left commented out). Confirming the recipe
    transfers to models it was not tuned on is the real test of [Finding 10](#finding-10).
 2. **Settle the last 1% properly, if at all.** The `CELL_DETECT` /
    `H_THRES[3]` ambiguity would be resolved by any model where the two
@@ -2246,7 +2378,7 @@ next step is breadth rather than more depth on Bottle1:
    decide it for free.
 3. **Re-examine the runtime question.** Every conclusion in the 2026-08-05
    entry about Bottle1 being ~27x slower than `bone` was measured on octrees
-   3-6x larger than they should have been. At the correct four-tier setting
+   3-6x larger than they should have been. At the correct four-level setting
    Bottle1's octree construction takes ~250 s rather than 2,168 s, so the
    ["218 s is unreachable with the public code" synthesis](#why-218s-is-unreachable) below needs
    re-measuring before it is trusted.
