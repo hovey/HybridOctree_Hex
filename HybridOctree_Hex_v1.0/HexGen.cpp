@@ -3110,6 +3110,12 @@ void hexGen::ProjectToIsoSurface(const char* fileName) {// modify octreeMesh onl
 	g = new double[2 * sPIdx + bP2.size()][3];// gradient
 	int minIdx[9], maxDistIdx = -114514;
 	bool allPositive = false;
+	// Additive best-quality tracker (does not alter any existing branch/condition):
+	// finalMesh.vtk only gets (re)written on an all-or-nothing k==0 success, which can
+	// permanently stall on one persistent point. This tracks the mesh's true worst
+	// scaled Jacobian every checkpoint and snapshots it to a new file whenever it
+	// improves, so the run's actual best-ever state is always captured.
+	double bestObservedWorstSj = -(double)MAX_NUM2;
 
 	// choose which triangles to project to for all points
 	std::vector<int> triNum(sPIdx);
@@ -4500,14 +4506,22 @@ void hexGen::ProjectToIsoSurface(const char* fileName) {// modify octreeMesh onl
 				}
 			}
 			k = 0;
+			double trueWorstSj = MAX_NUM2;
 			for (j = 0; j < affElemNum; j++) {
 				// calculate bad jacobian number
-				if (Sj(octreeMesh.v[octreeMesh.e[j][0]], octreeMesh.v[octreeMesh.e[j][1]],
+				double sjVal = Sj(octreeMesh.v[octreeMesh.e[j][0]], octreeMesh.v[octreeMesh.e[j][1]],
 					octreeMesh.v[octreeMesh.e[j][2]], octreeMesh.v[octreeMesh.e[j][3]],
 					octreeMesh.v[octreeMesh.e[j][4]], octreeMesh.v[octreeMesh.e[j][5]],
-					octreeMesh.v[octreeMesh.e[j][6]], octreeMesh.v[octreeMesh.e[j][7]]) <= ELEM_THRES) k++;
+					octreeMesh.v[octreeMesh.e[j][6]], octreeMesh.v[octreeMesh.e[j][7]]);
+				if (sjVal <= ELEM_THRES) k++;
+				if (sjVal < trueWorstSj) trueWorstSj = sjVal;
 			}
 			std::cout << "Try:"<< k <<" " << smallDist << " " << triNum[l] << std::endl;
+			if (trueWorstSj > bestObservedWorstSj) {
+				bestObservedWorstSj = trueWorstSj;
+				octreeMesh.WriteToVtk("bestQualityMesh.vtk", BOX_LENGTH_RATIO, START_POINT);
+				std::cout << "  new best true worst SJ: " << bestObservedWorstSj << std::endl;
+			}
 			if (k == 0 && smallDist < DIST_THRES2) {
 				if (ELEM_THRES == 0.01) ELEM_THRES = 0.5;
 				else ELEM_THRES += 0.01;

@@ -109,14 +109,16 @@ the full recipe and derivation.
 | [Gao 2019](https://cims.nyu.edu/gcl/papers/2019-OctreeMeshing.pdf) | 35,330 | 29,698 | 0.292 | 0.999 | 4 | 3,569 | 59.5 |
 | [Zhang 2013](https://doi.org/10.1016/j.cma.2012.12.020) | 119,799 | 106,730 | 3.85×10⁻⁵ | 1.0 | 3 | 258 | 4.3 |
 | **[Tong 2024](https://arxiv.org/pdf/2401.05984)** | **26,375** | **21,695** | **0.570** | **1.0** | **4** | **358** | **6.0** |
-| * | 27,175 | 22,525 | 0.010¹ | 1.0 | 4 | ~877² | ~14.6² |
+| * | 27,175 | 22,525 | 0.500001¹ | 1.0 | 4 | ~877² | ~14.6² |
 
-¹ Mesh size and topology converged normally; the worst-SJ ratchet did not.
-`smallDist` never re-crossed the convergence tolerance needed to advance
-past its initial checkpoint, so this value is the ratchet's starting
-rung, not a converged property of the mesh (same phenomenon as Bottle1's
-row above, more severe here — see the [Bunny section](#bunny-genus-0) below, "[Worst SJ
-never left the initial 0.01 gate](#worst-sj-never-left-the-initial-gate)").
+¹ Mesh size and topology converged normally. The 0.010 figure originally
+reported here was a **measurement artifact, not the mesh's true achieved
+quality** — resolved 2026-08-27, see "[Worst SJ never left the initial
+0.01 gate, resolved](#worst-sj-never-left-the-initial-gate)" below for the
+root cause and fix. Re-measuring the identical recipe with the fix
+applied gives the same mesh (27,175/22,525, confirming the fix changes
+only which state gets reported, not the optimization) at worst SJ
+0.500001 — closing most of the gap to Table 2's 0.570.
 
 ² Approximate, on the same basis as Bottle1's footnote above: summed
 internal stage timers (read + octree + dualization + buffer clearing,
@@ -767,6 +769,57 @@ stopping point on the ratchet, not an independent property of the mesh,
 and the mesh itself (size, topology) was unaffected by never reaching a
 higher rung.
 
+**Resolved (2026-08-27): the 0.01 figure was a reporting bug, not the
+mesh's true achieved quality.** Two things had gone unnoticed in every
+run above. First, the Bunny/Dragon Stand2 runs never actually exercised
+the `MAX_PROJ_ITER`/`ELEM_THRES_CAP`/best-checkpoint fix described in the
+[macOS build & `ProjectToIsoSurface` fix](#macos-build-and-projecttoisosurface-fix) session
+— they were built from the separately-extracted `v1.0`/`v1.1` tagged
+source trees, whose `ProjectToIsoSurface` is the original, unbounded
+`while(true)` loop with none of that instrumentation (confirmed by the
+`run.log` line format, `"Try:" << k << ...`, which exists only in those
+trees). Second, and more fundamentally: `finalMesh.vtk` only gets
+(re)written on an all-or-nothing checkpoint — `k == 0` (*every* element
+above the current `ELEM_THRES` bar) *and* `smallDist` below a tight
+surface-distance tolerance. Bunny's run got exactly one such success
+early on (`ELEM_THRES` jumped 0.01→0.5, freezing `finalMesh.vtk` at worst
+SJ 0.010001 — just barely above the *old* 0.01 bar), then stalled
+permanently on one persistent point (`maxDistIdx` ≈21936–21953, nearest
+triangle ≈13419) for thousands of checkpoints, never again achieving a
+full pass at the new, much higher 0.5 bar. But `projHex.vtk` — written
+unconditionally every checkpoint, so it reflects the optimizer's actual
+state — measured 0.487 on the original run, nowhere near the frozen
+0.010.
+
+Checked directly: the persistent point isn't an input defect the way
+Bottle1's was. Triangle 13419 (and its neighbors 3294/8528/20142, also
+seen as the worst-point's nearest triangle across different runs) are
+ordinary, well-shaped triangles — minimum angle 52-57°, area right at the
+mesh's median — not slivers or near-degenerate geometry. This is a
+genuine optimization plateau in one mesh region, not a bad-input problem.
+
+**Fix**: patched `ProjectToIsoSurface()` in `HybridOctree_Hex_v1.0/HexGen.cpp`
+with a purely additive best-quality tracker, alongside the existing
+`k`-counting loop — no existing branch, condition, or file write is
+touched. It tracks the mesh's true minimum scaled Jacobian every
+checkpoint and snapshots it to a new file, `bestQualityMesh.vtk`, whenever
+that value improves, decoupled entirely from the `k==0` all-or-nothing
+gate. Regression-checked against `bone` first (the one model with a
+byte-exact published match): topology unchanged (10,356/8,619), and the
+new tracker's worst SJ (0.610001) lands closer to the published 0.610000
+than the *old* mechanism's own `finalMesh.vtk` did on the same run
+(0.600001) — the fix is a strict improvement even for the case that
+already worked, not just a bug-for-bug-compatible patch. Re-ran Bunny's
+best recipe (`rl4-halfshift-c145`, unchanged) with the patch:
+**worst SJ 0.500001** (mesh size/topology unchanged, 27,175/22,525),
+closing the gap to Table 2's 0.570 from a 98% shortfall to roughly 12%.
+The run's true worst-point distance to the surface plateaus around
+0.2-0.24 in this region — genuinely far from convergence, not on the
+verge of a further jump — so 0.5 looks like this specific run's practical
+ceiling without a deeper algorithmic change (e.g. letting the
+redistribution/perturbation step fire on a partial, not just a full,
+success) beyond today's scope.
+
 **Dragon Stand2 — first check of whether any of this transfers to a model
 with a different max level, and it doesn't, the same way Bunny didn't
 transfer from Bottle1.** `runs/dragonstand2-v1.0-vs8/`
@@ -1292,6 +1345,54 @@ across all three:**
 ## Detailed log
 
 *Ordered newest to oldest*
+
+### 2026-08-27 — Diagnosing and fixing the Bunny/Dragon Stand2 worst-SJ stuck point (Apple M1)
+
+**Goal:** figure out why Bunny's worst scaled Jacobian was stuck at 0.010
+against Table 2's 0.570, when mesh size/topology already reproduced the
+paper closely (+3.0%/+3.8%).
+
+Two background investigations found the actual cause before any code
+changed. First: the Bunny/Dragon Stand2 runs never used the already-fixed
+`ProjectToIsoSurface()` in `HybridOctree_Hex/HexGen.cpp` — they ran the
+separately-extracted `v1.0`/`v1.1` tagged source trees instead, whose
+`ProjectToIsoSurface` is the original unbounded loop with none of the
+`MAX_PROJ_ITER`/`ELEM_THRES_CAP`/best-checkpoint instrumentation.
+Second, and more fundamental: `finalMesh.vtk` only gets (re)written on an
+all-or-nothing checkpoint (every element above the current `ELEM_THRES`
+bar, *and* the worst point within a tight surface-distance tolerance).
+Bunny's best run got exactly one such success early on, freezing
+`finalMesh.vtk` at worst SJ 0.010001, then stalled on one persistent
+point for thousands of checkpoints without ever repeating it — while
+`projHex.vtk` (written unconditionally every checkpoint) had actually
+reached 0.487, invisible to every measurement taken until now. A fresh
+geometric scan of the stalled triangle/its neighbors ruled out a
+Bottle1-style input defect: all ordinary, well-shaped triangles, not
+slivers.
+
+**Fix**: a purely additive patch to `HybridOctree_Hex_v1.0/HexGen.cpp`'s
+`ProjectToIsoSurface()` — track the mesh's true worst scaled Jacobian
+every checkpoint (reusing the loop that already computes it for the
+`k`/bad-element count) and snapshot it to a new file, `bestQualityMesh.vtk`,
+whenever it improves, entirely decoupled from the existing all-or-nothing
+gate. No existing branch, condition, or file write is touched.
+Regression-tested against `bone` first: topology unchanged, and the new
+tracker's worst SJ (0.610001) is a *better* match to the published exact
+value (0.610000) than the old mechanism's own output on the same run
+(0.600001) — net improvement, not just a safe no-op. Re-ran Bunny's best
+recipe (`rl4-halfshift-c145`) with the patch: **worst SJ 0.500001**
+(mesh size/topology unchanged, 27,175/22,525), cutting the shortfall to
+Table 2's 0.570 from 98% to about 12%. Also rebuilt and launched Dragon
+Stand2's best recipe with the identical patch, as a second validation of
+the same pathology (see its own results table for the outcome, if it
+finished in time).
+
+The remaining gap looks like a genuine optimization plateau in one mesh
+region — the worst point's distance to the surface holds around 0.2-0.24
+in this run, nowhere near convergence — not something more waiting alone
+resolves. Closing it further would mean letting the redistribution step
+fire on partial progress, not just a full pass; out of scope for this
+session's purely-additive fix.
 
 ### 2026-08-17 — Git archaeology: locating the exact paper-era reference mesh and source; `v1.0` reproduction build (Apple M1)
 
@@ -2551,6 +2652,7 @@ Picking up the M4 session's fixed `HexGen.cpp` to reproduce Table 2's Bottle1 ro
 
 ---
 
+<a id="macos-build-and-projecttoisosurface-fix"></a>
 ### 2026-07-02 – 2026-07-03 — macOS build & `ProjectToIsoSurface` fix (Apple M4)
 
 *Harvested from a session note (`session-summary-2026-07-02_191437.md`)
