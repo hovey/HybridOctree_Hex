@@ -81,6 +81,22 @@ table — for readability on the slower rows.
 
 *: From this present study, the best match to the Tong 2024 published results.
 
+### 0. Bone (calibration testbed, not one of Table 2's twelve models)
+
+| Method | Vertices | Elements | Worst SJ | Best SJ | Refinement Level | Time (s) | Time (min) |
+|---|---|---|---|---|---|---|---|
+| **Published (this repo's own README)** | **10,356** | **8,619** | **0.61** | **1.0** | — | — | — |
+| * | 10,356 | 8,619 | 0.610001 | 1.0 | 5 | — | — |
+
+`v1.0`'s shipped constants, run unmodified against `bone`, reproduce
+`our results/bone.vtk` **exactly** — matching vertex count, matching
+element count, and byte-identical cell connectivity. Worst SJ lands at
+0.610001 against the README's published 0.61, the same value to the
+precision reported. See [2026-08-17 (continued)](#2026-08-17-continued--reading-the-octree-level-straight-off-the-meshes-v10-reproduces-bone-exactly)
+in the detailed log below for the full derivation, and the [Bone](#bone-calibration-testbed-not-a-table-2-model)
+section further down for this repo's earlier, superseded calibration
+attempts against this same model.
+
 ### 1. Bottle1 (Genus-1)
 
 | Method | Vertices | Elements | Worst SJ | Best SJ | Refinement Level | Time (s) | Time (min) |
@@ -118,7 +134,11 @@ quality** — resolved 2026-08-27, see "[Worst SJ never left the initial
 root cause and fix. Re-measuring the identical recipe with the fix
 applied gives the same mesh (27,175/22,525, confirming the fix changes
 only which state gets reported, not the optimization) at worst SJ
-0.500001 — closing most of the gap to Table 2's 0.570.
+0.500001 — closing most of the gap to Table 2's 0.570. Cut off manually
+after 4h47m24s wall-clock (started 2026-08-27 09:45:52, stopped 14:33:16)
+once the value held stable for over 3.5 hours (3,934 checkpoints) with no
+further movement — a confirmed plateau, not an arbitrary stopping point;
+no automatic stopping condition exists for this loop.
 
 ² Approximate, on the same basis as Bottle1's footnote above: summed
 internal stage timers (read + octree + dualization + buffer clearing,
@@ -149,12 +169,19 @@ below for the full recipe and derivation.
 |---|---|---|---|---|---|---|---|
 | [Gao 2019](https://cims.nyu.edu/gcl/papers/2019-OctreeMeshing.pdf) | 74,618 | 61,441 | 0.0290 | 0.999 | 5 | 23,062 | 384.4 |
 | **[Tong 2024](https://arxiv.org/pdf/2401.05984)** | **62,576** | **50,853** | **0.560** | **1.0** | **4** | **2,052** | **34.2** |
-| * | 62,307 | 50,603 | 0.010¹ | 1.0 | 4 | ~2,710² | ~45.2² |
+| * | 62,307 | 50,603 | 0.500000¹ | 1.0 | 4 | ~2,710² | ~45.2² |
 
-¹ Mesh size and topology converged normally; the worst-SJ ratchet did
-not. Every one of this study's Dragon Stand2 fitting runs was pinned at
-this same initial-checkpoint value — see the [Bunny section](#bunny-genus-0) below, [Finding
-15](#finding-15), for the full pattern.
+¹ Mesh size and topology converged normally. The 0.010 figure originally
+reported here was the same measurement artifact documented for Bunny —
+resolved 2026-08-27, see "[Worst SJ never left the initial 0.01 gate,
+resolved](#worst-sj-never-left-the-initial-gate)" below. Re-ran this
+identical recipe with the fix applied, cut off manually after 3h44m39s
+wall-clock (started 2026-08-27 10:48:37, stopped 14:33:16 — no automatic
+stopping condition exists for this loop, same as every other run in this
+table): same mesh (62,307/50,603, confirming the fix doesn't alter the
+optimization) at worst SJ 0.500000, still oscillating on one point
+(index ≈56765) at the moment it was stopped, not a confirmed final
+plateau the way Bunny's is.
 
 ² Approximate, on the same basis as Bottle1's footnote above: summed
 internal stage timers (read + octree + dualization + buffer clearing,
@@ -820,6 +847,27 @@ ceiling without a deeper algorithmic change (e.g. letting the
 redistribution/perturbation step fire on a partial, not just a full,
 success) beyond today's scope.
 
+Re-ran Dragon Stand2's best recipe the same way, as a second validation
+of the identical pathology: **worst SJ 0.500000** (mesh size/topology
+unchanged, 62,307/50,603), against Table 2's 0.560. Unlike Bunny, this
+run was still oscillating on its own persistent point (index ≈56765) at
+the moment it was cut off, not a confirmed plateau — it may have had more
+room to climb with further runtime. Both runs were cut off manually
+after several hours, since neither `ProjectToIsoSurface` build used here
+has any automatic stopping condition:
+
+| Model | Cut off after | Started | Stopped | Config (`v1.0` source, `HybridOctree_Hex_v1.0/`) |
+|---|---|---|---|---|
+| Bunny | 4h47m24s | 2026-08-27 09:45:52 | 2026-08-27 14:33:16 | `VOXEL_SIZE_VALUE=7`, `LADDER_TOP=octreeDepth`, `C_THRES = {0.2121, 0.4243, 0.8485, 1.45, 3.3941}`, `H_THRES = {11.3137, 5.6569, 2.8284, 1.4142, 0.7071}`, `CELL_DETECT = 0.75` (identical to the `rl4-halfshift-c145` recipe above) |
+| Dragon Stand2 | 3h44m39s | 2026-08-27 10:48:37 | 2026-08-27 14:33:16 | `VOXEL_SIZE_VALUE=8`, `LADDER_TOP=octreeDepth`, `C_THRES = {0.21213203, 0.42426407, 0.84852814, 1.69705627, 3.39411255}`, `H_THRES = {11.3137085, 4.45, 2.6, 1.41421356, 0.70710678}`, `CELL_DETECT = 0.75` (identical to its own recipe in the Table 2 mini-table above) |
+
+Both binaries were built with `g++ -O3 -DNDEBUG -std=c++17` plus the
+`-D<NAME>_VALUE`/`-D<NAME>_VALUES` overrides shown, directly against
+`HybridOctree_Hex_v1.0/{Main,HexGen,Mesh}.cpp` (the `#ifndef`-guarded
+macro pattern already established for this tree) — no source edits
+needed beyond the one `ProjectToIsoSurface()` patch, which is shared by
+both builds.
+
 **Dragon Stand2 — first check of whether any of this transfers to a model
 with a different max level, and it doesn't, the same way Bunny didn't
 transfer from Bottle1.** `runs/dragonstand2-v1.0-vs8/`
@@ -1168,6 +1216,13 @@ across different models' shipped baselines.
 
 ## Bone (calibration testbed, not a Table 2 model)
 
+**Superseded by the exact match.** The table below reflects this
+session's calibration attempts as they stood on 2026-08-05, before the
+2026-08-17 discovery that `v1.0`'s own shipped constants — untouched —
+already reproduce `bone` byte-for-byte. See [0. Bone](#0-bone-calibration-testbed-not-one-of-table-2s-twelve-models)
+above for that result. The table below is kept for the record, to show
+what the earlier, unnecessary calibration work found.
+
 `bone` isn't one of Table 2's twelve models — it's the smallest sample in
 this repo's own broader `input boundaries`/`our results` collection, with
 published stats in this repo's own README rather than in the paper. The
@@ -1197,7 +1252,7 @@ were adopted for the Bottle1 redo. Neither the buggy nor the paper-literal
 values are being pursued further — see the [summary log](#summary-log) for why an exact
 match isn't expected from either given the curvature-formula mismatch.
 
-## Synthesis: what `bone`, Bottle1, and Bunny collectively show
+## Synthesis: what bone, Bottle1, and Bunny collectively show
 
 Three models, three different outcomes, now that all three have been
 pushed as far as this investigation has taken them. Putting them side by
@@ -1353,12 +1408,14 @@ against Table 2's 0.570, when mesh size/topology already reproduced the
 paper closely (+3.0%/+3.8%).
 
 Two background investigations found the actual cause before any code
-changed. First: the Bunny/Dragon Stand2 runs never used the already-fixed
+changed.
+
+* First: the Bunny/Dragon Stand2 runs never used the already-fixed
 `ProjectToIsoSurface()` in `HybridOctree_Hex/HexGen.cpp` — they ran the
 separately-extracted `v1.0`/`v1.1` tagged source trees instead, whose
 `ProjectToIsoSurface` is the original unbounded loop with none of the
 `MAX_PROJ_ITER`/`ELEM_THRES_CAP`/best-checkpoint instrumentation.
-Second, and more fundamental: `finalMesh.vtk` only gets (re)written on an
+* Second, and more fundamental: `finalMesh.vtk` only gets (re)written on an
 all-or-nothing checkpoint (every element above the current `ELEM_THRES`
 bar, *and* the worst point within a tight surface-distance tolerance).
 Bunny's best run got exactly one such success early on, freezing
@@ -1382,15 +1439,24 @@ value (0.610000) than the old mechanism's own output on the same run
 (0.600001) — net improvement, not just a safe no-op. Re-ran Bunny's best
 recipe (`rl4-halfshift-c145`) with the patch: **worst SJ 0.500001**
 (mesh size/topology unchanged, 27,175/22,525), cutting the shortfall to
-Table 2's 0.570 from 98% to about 12%. Also rebuilt and launched Dragon
+Table 2's 0.570 from 98% to about 12%. Also rebuilt and ran Dragon
 Stand2's best recipe with the identical patch, as a second validation of
-the same pathology (see its own results table for the outcome, if it
-finished in time).
+the same pathology: **worst SJ 0.500000** (62,307/50,603 unchanged),
+against Table 2's 0.560.
+
+Neither build has any automatic stopping condition, so both were cut off
+manually: Bunny after 4h47m24s (started 09:45:52, stopped 14:33:16) once
+0.500001 had held for over 3.5 hours (3,934 checkpoints) — a confirmed
+plateau; Dragon Stand2 after 3h44m39s (started 10:48:37, stopped at the
+same 14:33:16), which was still oscillating on its own stuck point
+(index ≈56765) at the moment of cutoff, not a confirmed plateau — it may
+have had more room to climb.
 
 The remaining gap looks like a genuine optimization plateau in one mesh
 region — the worst point's distance to the surface holds around 0.2-0.24
-in this run, nowhere near convergence — not something more waiting alone
-resolves. Closing it further would mean letting the redistribution step
+in Bunny's run, nowhere near convergence — not something more waiting
+alone resolves for that model. Closing it further would mean letting the
+redistribution step
 fire on partial progress, not just a full pass; out of scope for this
 session's purely-additive fix.
 
