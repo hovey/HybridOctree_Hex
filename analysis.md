@@ -1442,6 +1442,76 @@ across all three:**
    point-position convergence, and worst SJ never climbing doesn't affect
    that topology at all.
 
+<a id="why-no-single-parameter-set"></a>
+### Why no single parameter set reproduces all of Table 2
+
+Every model fitted so far has needed its own `C_THRES` values. Bottle1's
+recipe overshoots Bunny by 70%. Bunny's correction undershoots Bottle1 by
+45%. Dragon Stand2 and Ramses share a ladder rung and still land five times
+further from each other than either sits from its own target. The paper
+describes one fixed parameter set, so the two pictures need reconciling.
+The upstream repository's own history accounts for most of the difference.
+
+**The constants changed during the study.** Reading
+`HybridOctree_Hex/Initialization.h` at each upstream commit where the values
+are readable:
+
+| Date | Tag | `VOXEL_SIZE` | `C_THRES` | `H_THRES` |
+|---|---|---|---|---|
+| 2024-01-12 | — | 9 | {0.15, 0.3, 0.6, 1.2, 2.4} | {16, 8, 4, 2, 1} |
+| 2024-01-16 | — | 9 | {0.15, 0.3, 0.6, 1.2, 2.4} | {16, 8, 4, 2, 1} |
+| 2024-01-19 | `v1.2` | 10 | {0.1, 0.2, 0.4, 0.8, 1.6, **3.2**} | {16, 8, 4, 2, 1, **0.5**} |
+| 2024-01-21 | `v1.2` | 10 | {0.1, 0.2, 0.4, 0.8, 1.6} | {16, 8, 4, 2, 1} |
+| 2024-01-31 | `v1.2` | 10 | {0.1, 0.2, 0.4, 0.8, 1.6} | {16, 8, 4, 2, 1} |
+| 2024-02-22 | `v1.3` | 10 | {**0, 0**, 0.4, 0.8, 1.6} | {16, 8, 4, 2, 1} |
+
+The journal records the paper as received 14 January 2024, revised 23
+February 2024, and accepted 16 March 2024. The curvature array therefore
+changed three times across that window. The array length itself went from
+five entries to six and back within three days (19-21 January). The sixth
+entry appearing on 19 January is the same one `v1.2`/`v1.3` later carry
+commented out, and it is what David's level-9 population requires
+([Finding 10](#finding-10)). `VOXEL_SIZE` also moved 9 → 10 in the same
+window, which is the per-model level-count knob of [Finding 9](#finding-9).
+
+**Thickness matched throughout; curvature never did.** `H_THRES` reads
+`{16, 8, 4, 2, 1}` at every commit — identical to the paper's
+`T_thres = {16, 8, 4, 2, 1}`, and unchanged apart from the brief six-entry
+form, which simply continues the halving with `0.5`. `C_THRES` never equals
+the paper's `G_thres = {0.5, 1, 2, 4, 8}` at any commit in the history.
+
+That asymmetry has a straightforward explanation, and it is probably the
+whole story. Thickness means the same thing in both places. The paper
+measures a distance along a ray from `P_i` along its normal, and the code
+measures a distance along a ray from `P_i` along its normal, so the numbers
+carry over directly. Curvature does not. The paper defines `G` as a Gaussian
+curvature, `‖Σ(cot α_ij + cot β_ij)(P_j − P_i)‖² / (4A_i)`, using cotangent
+weights over a Voronoi cell area. `GetCellValue()` instead accumulates
+`(angle − π)²` over each vertex's incident edges (`HexGen.cpp:882`). Those
+are different quantities in different units. Their thresholds were never
+comparable, so there is no reason to expect `C_THRES` to equal `G_thres`.
+Section 2.1 describes a formulation the released code does not implement —
+the ordinary kind of drift that accumulates when a paper and its codebase
+develop in parallel over months.
+
+**What this means for reproduction.** The published curvature values are not
+a usable starting point for this codebase, because they are calibrated for a
+quantity the released code does not compute. The published thickness values
+are usable, and we have used them unchanged on several models. Nothing in
+the history indicates a per-model parameter table ever existed: every commit
+carries a single global set, revised over time. Table 2's twelve rows were
+most plausibly generated across that revision window rather than in one
+batch, which on its own would stop any single set from reproducing all
+twelve. Bottle1's reference mesh predating the first committed source by one
+day ([Finding 8](#finding-8)) points the same way — some Table 2 runs may
+have used constants that were never committed.
+
+None of this changes the fitting procedure. [Finding 15](#finding-15) still
+applies: fit each model's thresholds against its own reference mesh's
+per-level parent counts, treat the shipped values as a starting point rather
+than a target, and read `H_THRES` as the one array where the paper's numbers
+transfer directly.
+
 ## Summary log
 
 *Ordered oldest to newest*
