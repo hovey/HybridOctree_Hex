@@ -926,6 +926,133 @@ macro pattern already established for this tree) — no source edits
 needed beyond the one `ProjectToIsoSurface()` patch, which is shared by
 both builds.
 
+<a id="bunny-per-level-fit"></a>**2026-08-28 – 29 — [Finding 15](#finding-15)'s mechanical per-level fit,
+applied back to Bunny: 26,255 / 21,702 vs. 26,375 / 21,695 (−0.45% /
++0.03%), the closest cell-count match of any Table 2 model so far.**
+Bunny's `rl4-halfshift-c145` fit predates [Finding 15](#finding-15), so
+we re-fitted Bunny with the per-level procedure that took Dragon Stand2
+to −0.43%/−0.49%. The starting diagnosis: `rl4-halfshift-c145`'s final
+per-threshold refined-parent counts are 808.5 / 1,170.9 / 1,023.6
+against the reference's 832.1 / 1,234.0 / 871.7 (thresholds 1/2/3,
+12-edge-mean metric). Its +3.0%/+3.8% total overshoot was one threshold
+overshooting +17.4% (threshold 3, from the `C_THRES[3]=1.45` loosening)
+masking undershoots at thresholds 1 and 2. Ten configurations (two full
+runs killed early, four octree-stage probes, four full runs to a
+stabilized `projHex.vtk`) produced the fit and three new mechanisms:
+
+- **`H_THRES` is an inert knob at Bunny's thresholds 1–2 in this
+  regime.** Loosening `H_THRES[1]` 5.6569→6.0 (+7.9% union candidates
+  via `refine_criteria_stats`) and `H_THRES[2]` 2.8284→3.1 (+11.8%)
+  moved final parent counts by less than 1%. The added thickness
+  candidates sit in regions the child-intersect propagation already
+  refines.
+- **`C_THRES[2]` is the real threshold-2 lever.** Octree-stage probes at
+  `C_THRES[2]` 0.8485→0.80→0.75 moved threshold 2's octree parents
+  2,128→2,352→2,496, with only +24/+56 upward propagation into
+  threshold 1 and threshold 3 bit-identical (1,512) across all three —
+  [Finding 15](#finding-15)'s locality, now confirmed from the
+  loosening-upward direction as well. Curvature candidates reach surface
+  regions thickness candidates do not. `C_THRES[1]` is weak the same way
+  `H_THRES[1]` is: 0.4243→0.40 bought +5 final parents, and threshold 1
+  stayed pinned at 807–816 across every configuration tried.
+- **Threshold 3's per-candidate weights are lumpy, and the reference
+  falls in a dead zone.** Final threshold-3 parents at
+  `refine_criteria_stats` candidate counts 42/43/44/45 (`C_THRES[3]` =
+  1.51/1.505/1.50/1.49): 833.6 / 837.4 / 938.0 / 971.4. One surface
+  point (candidate #44) controls ~100 refined parents. The reference's
+  871.7 sits between candidates #43 and #44, so no `C_THRES[3]` value
+  can land it.
+
+| Config (`C_THRES[1]`, `[2]`, `[3]`) | Points | Cells | vs. target | parents t1 / t2 / t3 |
+|---|---|---|---|---|
+| Table 2 target | **26,375** | **21,695** | — | 832.1 / 1,234.0 / 871.7 |
+| **`fitC` (0.4243, 0.82, 1.51)** | **26,255** | **21,702** | **−0.45% / +0.03%** | 806.8 / 1,255.8 / 833.6 |
+| `fitD` (0.4243, 0.827, 1.505) | 26,048 | 21,515 | −1.2% / −0.8% | 806.9 / 1,225.9 / 837.4 |
+| `fitE` (0.40, 0.83, 1.505) | 26,084 | 21,542 | −1.1% / −0.7% | 810.8 / 1,225.2 / 838.4 |
+| `fitF` (0.4243, 0.827, 1.50) | 26,859 | 22,258 | +1.8% / +2.6% | 806.8 / 1,228.5 / 938.0 |
+| `fitA` (0.40, 0.82, 1.49) | 27,480 | 22,779 | +4.2% / +5.0% | 811.8 / 1,260.7 / 971.4 |
+| `fitB` (0.40, 0.80, 1.49) | 28,310 | 23,519 | +7.3% / +8.4% | 812.9 / 1,365.7 / 971.9 |
+
+All rows: `v1.0` source with the `bestQualityMesh.vtk` patch,
+`VOXEL_SIZE_VALUE=7`, `LADDER_TOP=7`, `CELL_DETECT_VALUE=0.75`,
+`C_THRES[0]=0.2121`, `C_THRES[4]=3.3941`, `H_THRES` at the halfshift
+values `{11.3137, 5.6569, 2.8284, 1.4142, 0.7071}`. Counts come from a
+stabilized `projHex.vtk` (the 2026-08-18 protocol); `fitC`'s totals were
+re-measured twice, 10 and 25 minutes apart, and did not move. Runs
+deliberately shared the machine, so no timings were recorded.
+
+**Why `fitC` is the stopping point, not a waypoint.** Every knob still
+available moves points and cells together in roughly an 8:7 ratio.
+`fitC`'s residual — −120 points against +7 cells — is a *distribution*
+imbalance (threshold 1 −25 parents, threshold 2 +22, threshold 3 −38),
+and the three knobs that could rebalance it are the three shown above to
+be pinned, dead-zoned, or already fitted. Closing the last 120 points
+would require breaking the cell-count match, and vice versa. `fitC`'s
+projection run was left going overnight for the worst-SJ ratchet.
+
+**Overnight worst-SJ result: 0.010 — the ratchet's *first* firing is the
+gate, and `fitC` never got it.** After 7h36m and 5,701 checkpoints
+(2026-08-28 23:30 → 2026-08-29 06:06), `fitC`'s worst SJ never moved:
+`projHex.vtk` 0.009996, `bestQualityMesh.vtk` peaked at 0.010045 within
+minutes of projection starting and never improved. The run.log shows why,
+and it sharpens the 2026-08-27 stuck-point story: every late checkpoint
+reads `Try:0` — *zero* elements below the 0.01 bar — but `smallDist`
+oscillates at 0.03–0.06 on one persistent point (nearest triangle 6467),
+never crossing the `1e-4` tolerance that a checkpoint success also
+requires. `rl4-halfshift-c145` got exactly one lucky early success,
+which raised `ELEM_THRES` 0.01→0.5 and turned on quality pressure — its
+minimum then climbed to 0.500001. `fitC`'s stuck point blocked that
+first firing, so its bar stayed at 0.01 and the optimizer spent the
+whole night chasing surface distance with no quality pressure at all.
+Same pathology, one rung earlier: worst SJ is a ratchet stopping point,
+and this run stopped before the ratchet's first click.
+
+**Morning proof (2026-08-29 06:10 – 06:48): the mesh reaches 0.5 in one
+minute once the gate opens.** We re-ran `fitC`'s exact configuration
+with `ELEM_THRES` initialized to 0.5 instead of 0.01
+(`runs/bunny-v1.0-fitC-elem05/`, source tweak on a scratchpad copy —
+the repo tree is untouched), reproducing by construction the
+post-first-success state `rl4-halfshift-c145` reached by luck. The
+best-quality tracker's first snapshot (the raw dual mesh) read −0.487;
+*one minute later* it read 0.499921, and it finished at **0.500000**
+(topology identical: 26,255 / 21,702, best SJ 1.0, 733 checkpoints in
+38 minutes). Seven hours of overnight runtime versus sixty seconds,
+separated only by the bar's initial value: `fitC`'s worst SJ was never a
+property of the mesh, only of whether quality pressure was on. Both
+this run and `c145`'s 0.500001 sit exactly at the 0.5 bar — the bar,
+not the geometry, is binding in both.
+
+**Table 2's 0.570 reached exactly (2026-08-29 afternoon).** The follow-up
+experiment — `ELEM_THRES` initialized at 0.57
+(`runs/bunny-v1.0-fitC-elem057/`, same `fitC` recipe, same scratchpad
+source-copy pattern) — climbed −0.422 → 0.554752 in the first five
+minutes of projection and reached **worst SJ 0.570000** about six
+minutes in (`bestQualityMesh.vtk` written 14:15, projection started
+~14:09; 982 checkpoints when killed), topology unchanged at
+26,255 / 21,702, best SJ 1.0. The reference `bunny.vtk` itself measures
+0.569998. Bunny's Table 2 row now reads, side by side:
+
+| | `fitC` + `ELEM_THRES=0.57` | Table 2 |
+|---|---|---|
+| Points | 26,255 | 26,375 |
+| Cells | 21,702 | 21,695 |
+| Worst SJ | **0.570000** | 0.570 (file: 0.569998) |
+| Best SJ | 1.0 | 1.0 |
+| Refinement level | 4 | 4 |
+
+Two more things this settles. First, the whole pipeline took ~11 minutes
+wall (~6 of them projection) — the same order as Table 2's reported
+358 s, where our ratchet-gated runs took 4-8 *hours* to do less. The
+paper's runtimes are consistent with runs whose quality bar was
+effectively at its final value, not runs that climbed the ratchet from
+0.01. Second, worst SJ lands wherever the bar is — 0.500001 at a 0.5
+bar, 0.570000 at a 0.57 bar, on the same mesh — so Table 2's per-model
+worst-SJ column (0.560, 0.570, 0.590, ...) reads like a record of
+per-model stopping bars rather than of intrinsic mesh-quality
+differences. We have not pushed the bar above 0.57 to find `fitC`'s
+true quality ceiling; that would be the next probe if the question
+ever matters.
+
 **Dragon Stand2 — first check of whether any of this transfers to a model
 with a different max level, and it doesn't, the same way Bunny didn't
 transfer from Bottle1.** `runs/dragonstand2-v1.0-vs8/`
@@ -1276,10 +1403,13 @@ across different models' shipped baselines.
 
 **Superseded by the exact match.** The table below reflects this
 session's calibration attempts as they stood on 2026-08-05, before the
-2026-08-17 discovery that `v1.0`'s own shipped constants — untouched —
+[2026-08-17 discovery](#finding-7) that `v1.0`'s own shipped constants —
+untouched (`C_THRES = {0.15, 0.3, 0.6, 1.2, 2.4}`,
+`H_THRES = {16, 8, 4, 2, 1}`, `VOXEL_SIZE = 9`, `CELL_DETECT = 1`) —
 already reproduce `bone` byte-for-byte. See [0. Bone](#0-bone-calibration-testbed-not-one-of-table-2s-twelve-models)
-above for that result. The table below is kept for the record, to show
-what the earlier, unnecessary calibration work found.
+above for the headline numbers and [Finding 7](#finding-7) for the full
+derivation. The table below is kept for the record, to show what the
+earlier, unnecessary calibration work found.
 
 `bone` isn't one of Table 2's twelve models — it's the smallest sample in
 this repo's own broader `input boundaries`/`our results` collection, with
@@ -1474,6 +1604,92 @@ commented out, and it is what David's level-9 population requires
 ([Finding 10](#finding-10)). `VOXEL_SIZE` also moved 9 → 10 in the same
 window, which is the per-model level-count knob of [Finding 9](#finding-9).
 
+<a id="finding-16"></a>
+### Finding 16 — the released code cannot use `G_thres`, and only one of two scenarios can be true
+
+The paper defines `G` as Gaussian curvature (cotangent weights over a
+Voronoi cell area). The code computes a different quantity in different
+units — an unnormalized `(angle − π)²` sum over incident edges,
+accumulated in `ReadRawData()` (`HybridOctree_Hex_v1.0/HexGen.cpp:882`)
+and tested against `C_THRES` in `GetCellValue()`. `C_THRES` never equals
+`{0.5, 1, 2, 4, 8}` at any commit in the history. So the paper's
+Section 2.1 curvature formulation, and the thresholds calibrated for it,
+describe something the released code never implements.
+
+The unit difference is not cosmetic. The shipped `(angle − π)²` sum is
+unnormalized, so its magnitude depends on tessellation density, which
+differs per model — plausibly the very reason every model needs its own
+`C_THRES`. The paper's `G` is normalized by local Voronoi area (units
+~ 1/length), a tessellation-independent quantity. A threshold against a
+tessellation-independent quantity could transfer across models; a
+threshold against an unnormalized sum cannot be expected to.
+
+Two scenarios could explain how Table 2 was generated, and they cannot
+both be true. In the first, an unreleased code version implemented
+Section 2.1's Gaussian-curvature formulation, and `G_thres = {0.5, 1, 2,
+4, 8}` was its actual input. The paper then describes its own inputs
+accurately, but the released code cannot regenerate its results. In the
+second, the released algorithm generated Table 2, with per-model
+`C_THRES` values that no commit records. The released code is then the
+true generator, but `G_thres` as printed is a description of the method's
+intent, not the input that produced the table. The evidence we have leans
+toward the second: `bone` reproduces byte-exactly under the shipped
+formula and shipped `C_THRES` (the 2026-08-17 session), and every
+reference mesh was committed a day before the first source commit
+([Finding 2](#finding-2)).
+
+Either branch lands in the same place for reproduction: the paper and the
+released code, taken together, do not tell a story complete enough to
+regenerate Table 2 as written. The curvature inputs have to be re-fitted
+per model against each reference mesh ([Finding 15](#finding-15)). The
+paragraphs below give the commit-by-commit evidence.
+
+**Scenario (a) tested directly and eliminated (2026-08-29).** We
+implemented the paper's Section 2.1 formula as a switchable code path in
+`HybridOctree_Hex_v1.0/` — `-DCURVATURE_MODE=1` fills `triMesh.r[]` with
+Meyer's cotangent-Laplacian `G` (mixed Voronoi area, computed on the
+100-unit-cube coordinates), so `C_THRES_VALUES` carries the paper's
+literal `G_thres = {0.5, 1, 2, 4, 8}` with no downstream changes. The
+default path is byte-identical to the shipped source (verified by
+`g++ -E -P` diff against `HEAD`), and the mode-1 values match an
+independent Python implementation to 5×10⁻⁷ (VTK ASCII precision).
+Three measurements close the question:
+
+- **bone** (`runs/bone-v1.0-gauss/`, otherwise fully shipped
+  configuration): `G` maxes at **0.3011** on the 100-cube — not one of
+  bone's 6,047 vertices crosses even `G_thres[0] = 0.5`, so the paper's
+  configuration produces *zero* curvature-driven refinement. The octree
+  stops at level 6 (the byte-exact reference occupies levels 5-9) and the
+  final mesh comes out 4,061 / 3,139 against the reference's
+  10,356 / 8,619.
+- **Bunny and Bottle1 show the same wall**: on the 100-cube, Bunny has
+  0.01% of vertices above 0.5 and none above 1; Bottle1 has 1.85% above
+  0.5 and 0.01% above 1. `G_thres[1]`-`[4]` never fire on any of the
+  three models.
+- **No coordinate scale rescues it.** All three raw inputs are ~unit
+  scale (bone 0.95, Bottle1 1.63, Bunny 1.87), so computing `G` on raw
+  coordinates multiplies it by 53-106×, which flips the failure the other
+  way: bone's *median* `G` becomes ≈8.6, above the deepest threshold, so
+  more than half the surface would demand level-9 refinement (the
+  reference's level-9 population is 0.59%). The underlying obstruction is
+  dynamic range: `G_thres` spans 16× (0.5 → 8), while each model's `G`
+  distribution spans only ~4-20× from median to maximum — at *any*
+  global scale, the ladder cannot slice such a distribution into the
+  graded per-level populations the reference meshes actually have.
+
+This also settles the tessellation-independence conjecture above,
+half-for and half-against: the paper's `G` is indeed
+tessellation-independent, but its normalization concentrates the values
+so tightly around each model's characteristic feature scale that it has
+too little spread to drive a five-rung refinement ladder. The shipped
+unnormalized `(angle − π)²` sum — ~90× spread on Bunny — is the quantity
+that *can* grade refinement, at the price of being tessellation-dependent
+and therefore per-model. Combined with bone's byte-exact reproduction
+under the shipped formula, the verdict is now empirical, not
+inferential: **the released formula generated the reference meshes, and
+Section 2.1's formulation with `G_thres = {0.5, 1, 2, 4, 8}` cannot
+produce Table 2 at any coherent scale.**
+
 **Thickness matched throughout; curvature never did.** `H_THRES` reads
 `{16, 8, 4, 2, 1}` at every commit — identical to the paper's
 `T_thres = {16, 8, 4, 2, 1}`, and unchanged apart from the brief six-entry
@@ -1486,8 +1702,9 @@ measures a distance along a ray from `P_i` along its normal, and the code
 measures a distance along a ray from `P_i` along its normal, so the numbers
 carry over directly. Curvature does not. The paper defines `G` as a Gaussian
 curvature, `‖Σ(cot α_ij + cot β_ij)(P_j − P_i)‖² / (4A_i)`, using cotangent
-weights over a Voronoi cell area. `GetCellValue()` instead accumulates
-`(angle − π)²` over each vertex's incident edges (`HexGen.cpp:882`). Those
+weights over a Voronoi cell area. `ReadRawData()` instead accumulates
+`(angle − π)²` over each vertex's incident edges (`HexGen.cpp:882`), and
+`GetCellValue()` tests that sum against `C_THRES`. Those
 are different quantities in different units. Their thresholds were never
 comparable, so there is no reason to expect `C_THRES` to equal `G_thres`.
 Section 2.1 describes a formulation the released code does not implement —
@@ -1524,10 +1741,98 @@ transfer directly.
 | 2026-08-17 | M1 | Switched strategy from threshold-guessing to git archaeology. Found that the repo's `/our results/bottle1.vtk`, committed by the paper's first author Tong one day before the `v1.0` tag and never touched since, reproduces Table 2's Bottle1 numbers **exactly** (36,091 verts / 30,145 elems / worst SJ 0.560000 / best SJ 1.0, via `scaled_jacobian_stats`) — strong evidence it's the actual paper output file, not just a close match.<br><br>Statically diffed source across every upstream tag (`v1.0`→`v1.1`→`v1.2`→`v1.3`→current `HEAD`) and found the 2026-08-05 calibration work had anchored `C_THRES` to `v1.2`'s values — but `v1.0`/`v1.1`'s own original constants (`C_THRES={0.15,0.3,0.6,1.2,2.4}`, `VOXEL_SIZE=9`), the closest available source snapshot in time to the reference mesh, had never been tried.<br><br>Built and ran both `v1.0` and `v1.1` against the recovered original 2024-01-11 input surface. Both got permanently stuck at the same point in the final projection stage (never reached Table 2's numbers), which reframed the investigation: not a `v1.0`-vs-`v1.1` code-version question after all, but something about specific local geometry in Bottle1's input surface that this gradient-descent projection method can't resolve regardless of version.<br><br>Along the way, corrected two initial misreadings (see Detailed log for the full trail): `c291245` (2024-01-11, used for today's runs) has an off-by-one header bug that makes `ReadRawData()` silently duplicate its last triangle, while `f3247d8` (2024-01-16) parses cleanly; and `v1.1`'s new code block turned out to be a post-convergence step, not stuck-recovery logic, so it never actually ran in either attempt — the real cause of `v1.0`/`v1.1`'s differing exploration patterns is still open. `v1.1` left running as a low-priority background check; next step is a targeted dump of the local triangle neighborhood around the stuck point.<br><br>**Later the same day, both open questions closed.** Instead of dumping the triangle neighborhood, switched to measuring octree levels directly off the meshes — every model is rescaled into a fixed 100-unit cube, so a hex's edge length *is* its octree cell size and its level is just `log2(100/edge)`. That turned the whole problem from inference into measurement.<br><br>Three results followed. (1) `v1.0`'s shipped constants are the paper's constants: run unmodified on `bone` they reproduce `our results/bone.vtk` **exactly** — 10,356 / 8,619 / 0.610001 / 1.0, with byte-identical cell connectivity — so every earlier session's threshold calibration was solving a problem that did not exist. (2) Bottle1's reference mesh sits exactly on the committed input surface (max boundary deviation 0.00000), so the input was never the variable either; the one remaining variable is how deep the octree refines, and Table 2's "Refinement Level" column turns out to report exactly that — the number of active refinement thresholds, verified against every Table 2 model's reference mesh. Bottle1 used **four** thresholds where the public code hardcodes five, which alone accounts for the entire 3.4x oversizing: 101,688 elements → 27,750. (3) The all-day projection stalls were caused by `c291245`'s duplicated triangle — a controlled same-config comparison has `c291245` frozen forever at `smallDist=1.399` while `f3247d8` converges cleanly — so the header-correct file is the one to reproduce against, reversing this morning's choice.<br><br>Best configuration reached: 35,535 verts / 29,943 elems against 36,091 / 30,145 (−1.5% / −0.7%), with octree levels 6 and 7 — 93% of the mesh — matching to 0.5% and 0.1%. The last ~1% is not uniquely pinned by the evidence, and probably cannot be: the reference mesh predates the first committed source by a day. |
 | 2026-08-18 | M1 | Moved to Bunny, run as two parallel independent efforts (a Sonnet session plus a background Opus agent) to test whether Bottle1's [Finding-14](#finding-14) recipe transfers to a model it wasn't tuned on. It doesn't: applied as-is, it overshoots Bunny by 70% (43,691/36,901 vs. 26,375/21,695). Six threshold configurations tried, all confirmed by session's end (two via a clean `finalMesh.vtk`, two via a stabilized `projHex.vtk` after 2+ hour plateaus, matching a stuck-point pattern [Finding 13](#finding-13) first saw on Bottle1); the family is cleanly monotonic in threshold tightness. Devised a sharper diagnostic — refined-parent counts per octree threshold rather than mesh totals — which shows the error compounding roughly 2× per level across every plain-`rl4`-family config, the signature of a scaling problem rather than a single bad threshold. Derived and tabulated `VOXEL_SIZE`/`LADDER_TOP` settings for all remaining Table 2 models from the ladder-position/level relationship. Caught a methodology bug from the session's own early hours: `dualHex.vtk`'s point/cell count (pre-projection) is not a safe stand-in for `finalMesh.vtk`'s (post-projection can add 40-50% more elements by splitting low-quality ones). Cross-validated the best candidate (a `√2` "half-level" scale correction) against Bottle1 directly: it undershoots by 45%, the opposite direction from Bunny's overshoot under Bottle1's own recipe — a decisive negative result, settling that **the thresholds are genuinely per-model, not one universal rule**, while the ladder-depth ("Refinement Level") reading keeps holding up on every model. Closed Bunny's own gap anyway by tuning one purely-curvature-gated threshold (`C_THRES[3]`: 1.6971→1.45), reaching **27,175/22,525 vs. 26,375/21,695 (+3.0%/+3.8%)** on the first attempt — Bunny's best reproduction, comparable to Bottle1's own (−1.5%/−0.7%, opposite direction). Ran Dragon Stand2 as a third-model check (different ladder rung, `VOXEL_SIZE_VALUE=8`): ladder position held, thresholds again didn't transfer (+88%/+94%), a third independent confirmation. Closed with a cross-cutting synthesis section on what `bone`/Bottle1/Bunny collectively show, and a practical four-step recipe for future models. |
 | 2026-08-19 | M1 | Formalized the level-histogram methodology as a real tool, `scripts/level_histogram.py` (12-edge-mean metric, plus the per-level refined-parent-count diagnostic), replacing the one-off code from the day before. Used it to resolve two open questions cleanly: `bone`'s level-9 population (0.59%, a ~25x drop from level 8) and David's level-10 population (0.71%, a 29x drop from level 9) are both genuine distortion tails, while David's level-9 population (20.77%, the *second-largest* band in the mesh) is real — so David does need six levels as Table 2 claims, and the "open reconciliation" between Findings [9](#finding-9) and [10](#finding-10) noted the day before was an artifact of applying the distortion-tail heuristic too loosely; checked against five models now (`bone`, Bottle1, Bunny, Dragon Stand2, David) without a miscall. Ran Ramses as a fourth-model ladder-position check (same rung as Dragon Stand2, `VOXEL_SIZE_VALUE=8`): ladder held, but the shipped-threshold mismatch was far more severe than any other model — +448%/+473% overshoot, a ~3.6-hour pipeline (its octree stage alone, 190 minutes, is the slowest single stage measured this session, on a *smaller* input than Dragon Stand2's), traced to a 4.3x-oversized pre-projection octree. Two same-ladder-rung models (Dragon Stand2, Ramses) landing five times further apart from each other than either is from its own target further rules out a per-rung correction shortcut. Added a full pipeline-timings table across every Bunny/Dragon Stand2/Ramses run. A background Opus agent worked Dragon Stand2's threshold fit in parallel throughout, using `refine_criteria_stats` sweeps and its own full-run tests, and landed the session's best result: **62,307/50,603 vs. 62,576/50,853 (−0.43%/−0.49%)**, beating Bottle1's previous best. Along the way it found **[Finding 15](#finding-15)**: the five refinement thresholds are coupled one-directionally — tightening one threshold changes that threshold only, exactly, while loosening one propagates upward to every shallower threshold — which turns future threshold-fitting from a search into a mechanical per-level match against the reference's refined-parent counts. Applied that procedure directly to Ramses (the most severe shipped-threshold mismatch found this session, +448%/+473%, concentrated almost entirely in one threshold's curvature gate) and reached **46,329/39,529 vs. 44,790/37,993 (+3.4%/+4.0%, worst SJ 0.570 vs. Table 2's 0.590)** in two rounds — far fewer than Dragon Stand2's six, direct evidence the procedure generalizes. Paused model reproduction at this point (five models done: `bone`, Bottle1, Bunny, Dragon Stand2, Ramses) at the user's request, to shift toward writing this material into the `automesh` mdbook's Section 8 (Hexahedral Meshing from a Surface). |
+| 2026-08-28 – 29 | M1 | Overnight autonomous session focused solely on Bunny. Applied [Finding 15](#finding-15)'s mechanical per-level fit (which Bunny's own 2026-08-18 fit predated) through ten configurations: two early kills, four octree-stage probes, four full runs. Three new mechanisms fell out: `H_THRES` is inert at Bunny's thresholds 1–2 (thickness candidates land where child-propagation already refines), `C_THRES[2]` is the real threshold-2 lever, and threshold 3's per-candidate weights are lumpy enough that the reference's 871.7 refined parents sit in a dead zone between two adjacent reachable values (837.4 / 938.0) — one surface point controls ~100 parents. Best configuration `fitC` (`C_THRES = {0.2121, 0.4243, 0.82, 1.51, 3.3941}`, halfshift `H_THRES`, `CELL_DETECT=0.75`): **26,255 / 21,702 vs. 26,375 / 21,695 (−0.45% / +0.03%)** — the closest cell-count match of any Table 2 model, beating the previous Bunny best (+3.0%/+3.8%). The residual is a per-threshold distribution imbalance the remaining knobs provably cannot rebalance without breaking the totals. `fitC`'s projection then ran overnight for the worst-SJ ratchet and never left 0.010 — its stuck point blocked the ratchet's *first* firing, so quality pressure never turned on. A 38-minute morning re-run with `ELEM_THRES` initialized at 0.5 proved the point: worst SJ −0.487 → 0.4999 in one minute, 0.500000 at the stop, topology identical. The afternoon follow-up at a 0.57 bar finished it: **worst SJ 0.570000 — Table 2's number exactly — six minutes into projection**, topology unchanged, best SJ 1.0. Bunny's row now matches Table 2 at −0.45% points / +0.03% cells / 0.570000 worst SJ / 1.0 best SJ / level 4, in ~11 minutes wall — the same order as the paper's reported 358 s, versus 4-8 hours for ratchet-gated runs. Worst SJ lands wherever the bar is; Table 2's worst-SJ column reads like per-model stopping bars, not intrinsic mesh quality. Separately, implemented the paper's Section 2.1 curvature formula as a gated code path (`-DCURVATURE_MODE=1`, default byte-identical to shipped) and eliminated [Finding 16](#finding-16)'s scenario (a) by direct measurement: the paper's `G` never crosses even `G_thres[0]` on bone/Bunny/Bottle1 at the 100-cube scale, overshoots the whole ladder at raw scale, and lacks the dynamic range to grade a five-rung ladder at any scale — the released `(angle − π)²` formula is what generated the reference meshes. |
 
 ## Detailed log
 
 *Ordered newest to oldest*
+
+### 2026-08-28 – 2026-08-29 — Bunny re-fitted with Finding 15's per-level procedure (Apple M1, overnight)
+
+**Goal:** reproduce Table 2's Bunny row exactly (26,375 / 21,695 / worst
+SJ 0.570), by applying [Finding 15](#finding-15)'s mechanical per-level
+fit — which Bunny's own 2026-08-18 fit predates — plus threshold sweeps.
+Load-bearing summary in the [Bunny section](#bunny-per-level-fit); this
+is the chronology and the dead ends.
+
+1. **Calibration.** `rl4-halfshift-c145`'s final parents (808.5 /
+   1,170.9 / 1,023.6) vs. the reference's (832.1 / 1,234.0 / 871.7)
+   located the whole +3.0%/+3.8% overshoot in threshold 3. Octree-stage
+   parents for the same runs gave octree→final survival ratios of 0.447
+   / 0.550 / 0.646 — but `rl4-halfshift-cd75`'s ratios (0.459 / 0.592 /
+   0.621) differ by up to 7%, and that drift ended up dominating every
+   octree-stage prediction we made tonight. The octree stage is a cheap
+   *relative* instrument (which threshold moved, and roughly how much);
+   only a stabilized `projHex.vtk` settles absolute counts.
+2. **`fit1`/`fit2` — the thickness dead end.** First attempt tightened
+   `C_THRES[3]` (1.55 / 1.52) and loosened `H_THRES[1]`/`[2]` (5.8–6.0 /
+   3.0–3.1) to fix the threshold 1–2 undershoots. The `C_THRES[3]`
+   tightening worked; the `H_THRES` loosening did nothing — threshold 1
+   and 2 finals moved less than 1% against +8–12% more candidates. Both
+   runs killed at −4.0%/−3.6% and −3.5%/−3.0%. One wrinkle worth keeping:
+   tightening `C_THRES[3]` 1.49→1.55 also pulled threshold 2's *octree*
+   parents down 56 (2,128→2,072) — removing a deep cell removes the
+   upward intersect-propagation it was feeding, so
+   [Finding 15](#finding-15)'s "tightening touches nothing shallower"
+   holds for a threshold's *own-gate* cells, not for propagation a
+   looser deep threshold had been injecting.
+3. **`fit3o`–`fit6o` — four octree-stage probes (killed after
+   `octree.vtk`).** Isolated each curvature knob at `C_THRES[3]=1.49`:
+   `C_THRES[2]` 0.8485/0.80/0.75 → threshold 2 octree parents
+   2,128/2,352/2,496 (the lever); `C_THRES[1]` 0.40 → threshold 1
+   +16 octree parents only (weak); threshold 3 bit-identical (1,512)
+   across all four (locality confirmed).
+4. **`fitA`–`fitF` — six full runs to stabilized `projHex.vtk`.**
+   Documented in the [Bunny section table](#bunny-per-level-fit). `fitC`
+   (`C_THRES = {0.2121, 0.4243, 0.82, 1.51, 3.3941}`, halfshift
+   `H_THRES`, `CELL_DETECT=0.75`) landed 26,255 / 21,702 — **−0.45% /
+   +0.03%**. `fitF` closed the threshold-3 question: candidate #44 alone
+   carries ~100 refined parents, so the reference's 871.7 is between
+   two adjacent reachable values (837.4 and 938.0) — a dead zone no
+   `C_THRES[3]` reaches.
+5. **Session mechanics worth recording:** nine background `HexGen`
+   processes from killed-off configs survived several `pkill -f`
+   attempts (the pattern matched the launch path, but the process name
+   is just `./HexGen`) and kept running for ~1.5 h. All comparative
+   numbers are deterministic counts, unaffected; timings were never
+   comparable and were not recorded. Killing by PID after mapping each
+   PID's working directory with `lsof -a -p <pid> -d cwd` is the
+   reliable way.
+6. **Overnight:** `fitC`'s projection ran alone on the machine for
+   7h36m / 5,701 checkpoints (2026-08-28 23:30 → 2026-08-29 06:06) and
+   its worst SJ never left 0.010 — the ratchet's first firing never
+   happened, so no quality pressure ever turned on (full mechanism in
+   the [Bunny section](#bunny-per-level-fit)).
+7. **Morning experiment (2026-08-29 06:10):** re-ran `fitC`'s exact
+   configuration with `ELEM_THRES` initialized to 0.5 instead of 0.01 —
+   reproducing by construction the post-first-success state that
+   `rl4-halfshift-c145` reached by luck — to test whether `fitC`'s mesh
+   is quality-capable and only the gate was missing. Source tweak made
+   on a scratchpad copy of the `v1.0` tree; the repo tree is untouched.
+   Result: worst SJ −0.487 → 0.499921 in *one minute*, 0.500000 at the
+   38-minute stop (733 checkpoints), topology unchanged. The gate was
+   the whole story; both runs cap exactly at the 0.5 bar. Killed at
+   06:48, the session's 7 AM deadline.
+8. **Afternoon follow-up (2026-08-29 ~14:09):** the same experiment with
+   `ELEM_THRES` initialized at 0.57 (`runs/bunny-v1.0-fitC-elem057/`)
+   reached **worst SJ 0.570000** — Table 2's number exactly — about six
+   minutes into projection, topology unchanged (26,255 / 21,702, best
+   SJ 1.0). Killed at 982 checkpoints. Full result table and what it
+   says about Table 2's worst-SJ column in the
+   [Bunny section](#bunny-per-level-fit).
+9. **`CURVATURE_MODE` added and [Finding 16](#finding-16)'s scenario (a)
+   eliminated (2026-08-29 afternoon):** implemented the paper's
+   Section 2.1 curvature as a compile-flag-gated alternative in
+   `HybridOctree_Hex_v1.0/` (`-DCURVATURE_MODE=1`; default 0 is
+   byte-identical to shipped, verified by preprocessor diff;
+   cross-validated against an independent Python implementation to
+   5×10⁻⁷). Ran bone under the paper's literal
+   `G_thres = {0.5, 1, 2, 4, 8}` (`runs/bone-v1.0-gauss/`): zero
+   curvature refinement fires — `G` maxes at 0.30 on the 100-cube —
+   and no global rescale fixes it (raw coordinates overshoot the whole
+   ladder instead; `G`'s dynamic range is ~4-20× against the ladder's
+   16× span). Verdict written into [Finding 16](#finding-16): the
+   released `(angle − π)²` formula generated the reference meshes.
 
 ### 2026-08-27 — Diagnosing and fixing the Bunny/Dragon Stand2 worst-SJ stuck point (Apple M1)
 
@@ -2050,8 +2355,8 @@ reference mesh *exactly*, on every metric and on connectivity.** `bone` is
 the ideal fast testbed here: its reference output `our results/bone.vtk` was
 committed by Hua Tong on `3c6b62a` (2024-01-14 22:56:28 -0500), its input
 `input boundaries/bone_tri.raw` has exactly one version in all of git history
-(`4aef107`, 2024-01-14 22:53:43 -0500 — no `c291245`/`f3247d8`-style
-ambiguity), the closest source snapshot is `542878d` (2024-01-14, same day,
+(`4aef107`, 2024-01-14 22:53:43 -0500), the closest source snapshot is
+`542878d` (2024-01-14 22:37:52 -0500, same day,
 still under the `HybridOctree_Hex_v1.0` directory naming), and a full run
 takes minutes rather than hours. Ran `bone_tri.raw` through today's `v1.0`
 build with `C_THRES = {0.15, 0.3, 0.6, 1.2, 2.4}` and `VOXEL_SIZE = 9`,
