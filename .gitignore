@@ -2,4 +2,7 @@
 build/
 build-*/
 scripts/scaled_jacobian_stats
-**/runs/*/*.vtk
+scripts/refine_criteria_stats
+**/runs/
+our results/bottle1.exo
+our results/bottle1.vtu
