@@ -601,12 +601,12 @@ strong evidence the *topology* (element splits) had already settled even
 though point-position convergence hadn't, so these are reported as
 confirmed rather than provisional, on that basis.
 
-³ To close Bunny's residual gap: at `rl4-halfshift-cd75` thresholds, threshold 3 (level 6→7) was confirmed purely curvature-gated (31 curvature
-candidates via `refine_criteria_stats`, 0 thickness candidates), so
-`C_THRES[3]` alone was swept from 1.6971 down toward 1.2 via
-`refine_criteria_stats` (candidate counts 31→41→49→61→74→78 at
-1.6971/1.55/1.45/1.35/1.25/1.2) and 1.45 (49 candidates, ~58% more than
-the `halfshift` baseline's 31) chosen as a first attempt — and it worked
+³ To close Bunny's residual gap: at `rl4-halfshift-cd75` thresholds, threshold 3 (level 6→7) was confirmed purely curvature-gated (55 curvature
+candidates, 0 thickness candidates), so
+`C_THRES[3]` alone was swept from 1.6971 down toward 1.2
+(candidate counts 55→79→95→110→127→138 at
+1.6971/1.55/1.45/1.35/1.25/1.2) and 1.45 (95 candidates, ~73% more than
+the `halfshift` baseline's 55) chosen as a first attempt — and it worked
 on the first try, landing within +3.8% without needing a second
 iteration. `finalMesh.vtk` was written and `projHex.vtk`'s topology
 confirmed stable well past that point.
@@ -956,12 +956,16 @@ stabilized `projHex.vtk`) produced the fit and three new mechanisms:
   `H_THRES[1]` is: 0.4243→0.40 bought +5 final parents, and threshold 1
   stayed pinned at 807–816 across every configuration tried.
 - **Threshold 3's per-candidate weights are lumpy, and the reference
-  falls in a dead zone.** Final threshold-3 parents at
-  `refine_criteria_stats` candidate counts 42/43/44/45 (`C_THRES[3]` =
-  1.51/1.505/1.50/1.49): 833.6 / 837.4 / 938.0 / 971.4. One surface
-  point (candidate #44) controls ~100 refined parents. The reference's
-  871.7 sits between candidates #43 and #44, so no `C_THRES[3]` value
-  can land it.
+  falls in a dead zone.** Final threshold-3 parents at curvature
+  candidate counts 83/84/86/88 (`C_THRES[3]` =
+  1.51/1.505/1.50/1.49): 833.6 / 837.4 / 938.0 / 971.4. The two
+  candidates added between `C_THRES[3]` 1.505 and 1.50 carry ~100
+  refined parents between them. The reference's 871.7 sits in the gap,
+  so no `C_THRES[3]` value can land it. (Candidate counts corrected
+  2026-08-29 — the original entry quoted 42/43/44/45 from the
+  undercounting `refine_criteria_stats`; the *parent* counts beside them
+  are measured off the runs and are unaffected, so the dead-zone
+  conclusion stands unchanged.)
 
 | Config (`C_THRES[1]`, `[2]`, `[3]`) | Points | Cells | vs. target | parents t1 / t2 / t3 |
 |---|---|---|---|---|
@@ -1149,6 +1153,19 @@ nothing below it to propagate from — loosening the deepest threshold is always
 safe, by the same logic that makes tightening any threshold always safe. The
 risk is specific to loosening a threshold that has thresholds beneath it, which
 neither Bottle1's nor Bunny's fits ever needed to do.
+
+**Caveat added 2026-08-29: `refine_criteria_stats` undercounts.** Its
+dihedral loop `break`s out of the partner-triangle loop after the first
+match, where `ReadRawData()` continues to every partner, so every
+candidate count quoted from that tool anywhere in this file is low —
+`bone` at the shipped thresholds is really 335 / 60 / 13 / 1 / 0, not
+185 / 28 / 7 / 0 / 0, and Bunny at `fitC` is 1,861 / 838 / 279 / 83 / 2,
+not 1,363 / 554 / 163 / 42 / 1. The tool was used here for *relative*
+guidance while sweeping one threshold at a time, and every fit was
+confirmed by a full run measured against the reference mesh, so the
+fits and conclusions stand; only the intermediate candidate numbers are
+wrong. Full diagnosis, with the verification that pins it, in
+`analysis_02.md`.
 
 A second, smaller finding from the same session: `refine_criteria_stats`
 candidate counts map to refined-parent counts by an approximate power
