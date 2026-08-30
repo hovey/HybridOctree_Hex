@@ -1164,8 +1164,7 @@ not 1,363 / 554 / 163 / 42 / 1. The tool was used here for *relative*
 guidance while sweeping one threshold at a time, and every fit was
 confirmed by a full run measured against the reference mesh, so the
 fits and conclusions stand; only the intermediate candidate numbers are
-wrong. Full diagnosis, with the verification that pins it, in
-`analysis_02.md`.
+wrong.
 
 A second, smaller finding from the same session: `refine_criteria_stats`
 candidate counts map to refined-parent counts by an approximate power

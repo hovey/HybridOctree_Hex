@@ -19,6 +19,16 @@ const int VOXEL_SIZE = VOXEL_SIZE_VALUE;// log2 voxel size
 #ifndef C_THRES_VALUES
 #define C_THRES_VALUES { 0.15, 0.3, 0.6, 1.2, 2.4 }
 #endif
+// Curvature formula selector (-DCURVATURE_MODE=1). 0 (default) is the shipped
+// implementation, byte-for-byte: the unnormalized (angle - pi)^2 sum over each
+// vertex's incident edges. 1 computes the paper's Section 2.1 quantity instead:
+// G_i = ||sum_j (cot a_ij + cot b_ij)(P_j - P_i)||_2 / (4 A_i), with A_i the
+// Voronoi (mixed) cell area of Meyer et al., the paper's ref [34], evaluated on
+// the 100-unit-cube rescaled coordinates. Under mode 1, C_THRES_VALUES carries
+// the paper's G_thres.
+#ifndef CURVATURE_MODE
+#define CURVATURE_MODE 0
+#endif
 const double C_THRES[5] = C_THRES_VALUES;// 4 5 6 7 8
 #ifndef H_THRES_VALUES
 #define H_THRES_VALUES { 16,8,4,2,1 }

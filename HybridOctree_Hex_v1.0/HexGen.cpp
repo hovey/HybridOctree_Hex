@@ -1,5 +1,12 @@
 #include "HexGen.h"
-double ELEM_THRES = 0.01;// element floating quality threshold
+// Initial quality bar for the ProjectToIsoSurface ratchet, overridable at
+// compile time (-DELEM_THRES_VALUE=0.5). The 2026-08-29 experiments showed the
+// achieved worst scaled Jacobian lands at this bar, so setting it to the target
+// quality up front replaces hours of ratchet-gated runtime with minutes.
+#ifndef ELEM_THRES_VALUE
+#define ELEM_THRES_VALUE 0.01
+#endif
+double ELEM_THRES = ELEM_THRES_VALUE;// element floating quality threshold
 int octreeENum; int hexMeshENum;
 
 // general functions
@@ -842,6 +849,71 @@ inline void hexGen::ReadRawData(const char* inputFileName, const char* outputFil
 		START_POINT[0] = 0;
 		START_POINT[1] = 0;
 		START_POINT[2] = 0;
+#if CURVATURE_MODE == 1
+		// Paper Section 2.1 / Meyer et al. (the paper's ref [34]):
+		// G_i = ||sum_{j in N(i)} (cot a_ij + cot b_ij)(P_j - P_i)||_2 / (4 A_i),
+		// A_i = Voronoi (mixed) cell area. One pass over triangles accumulates
+		// the cotangent Laplacian and the mixed area; coordinates are already
+		// rescaled into the 100-unit cube above, so G's units (1/length) are
+		// model-independent and C_THRES carries G_thres directly.
+		{
+			double* lapX = new double[triMesh.vNum];
+			double* lapY = new double[triMesh.vNum];
+			double* lapZ = new double[triMesh.vNum];
+			double* areaMixed = new double[triMesh.vNum];
+			for (i = 0; i < triMesh.vNum; i++) {
+				lapX[i] = 0; lapY[i] = 0; lapZ[i] = 0; areaMixed[i] = 0;
+			}
+			double e01[3], e02[3], e12[3], crossT[3], areaT2, areaT;
+			double cotAng[3], d01, d02, d12;
+			int va, vb, vc;
+			for (j = 0; j < triMesh.eNum; j++) {
+				va = triMesh.e[j][0]; vb = triMesh.e[j][1]; vc = triMesh.e[j][2];
+				for (k = 0; k < 3; k++) {
+					e01[k] = triMesh.v[vb][k] - triMesh.v[va][k];// a -> b
+					e02[k] = triMesh.v[vc][k] - triMesh.v[va][k];// a -> c
+					e12[k] = triMesh.v[vc][k] - triMesh.v[vb][k];// b -> c
+				}
+				CROSS(crossT, e01, e02)
+				areaT2 = sqrt(DOT(crossT, crossT));// twice the triangle area
+				if (areaT2 <= DIST_THRES) continue;// degenerate triangle
+				areaT = 0.5 * areaT2;
+				// cot of the interior angle at each corner
+				cotAng[0] = DOT(e01, e02) / areaT2;// at a
+				cotAng[1] = -(DOT(e01, e12)) / areaT2;// at b (edges b->a = -e01, b->c = e12)
+				cotAng[2] = DOT(e02, e12) / areaT2;// at c (edges c->a = -e02, c->b = -e12)
+				// cotangent Laplacian: the angle at each corner is the angle
+				// opposite the edge joining the other two corners
+				// edge (a,b), opposite angle at c
+				lapX[va] += cotAng[2] * e01[0]; lapY[va] += cotAng[2] * e01[1]; lapZ[va] += cotAng[2] * e01[2];
+				lapX[vb] -= cotAng[2] * e01[0]; lapY[vb] -= cotAng[2] * e01[1]; lapZ[vb] -= cotAng[2] * e01[2];
+				// edge (a,c), opposite angle at b
+				lapX[va] += cotAng[1] * e02[0]; lapY[va] += cotAng[1] * e02[1]; lapZ[va] += cotAng[1] * e02[2];
+				lapX[vc] -= cotAng[1] * e02[0]; lapY[vc] -= cotAng[1] * e02[1]; lapZ[vc] -= cotAng[1] * e02[2];
+				// edge (b,c), opposite angle at a
+				lapX[vb] += cotAng[0] * e12[0]; lapY[vb] += cotAng[0] * e12[1]; lapZ[vb] += cotAng[0] * e12[2];
+				lapX[vc] -= cotAng[0] * e12[0]; lapY[vc] -= cotAng[0] * e12[1]; lapZ[vc] -= cotAng[0] * e12[2];
+				// Meyer's mixed Voronoi area
+				d01 = DOT(e01, e01); d02 = DOT(e02, e02); d12 = DOT(e12, e12);
+				if (cotAng[0] >= 0 && cotAng[1] >= 0 && cotAng[2] >= 0) {
+					// non-obtuse: true Voronoi contribution per corner
+					areaMixed[va] += (d01 * cotAng[2] + d02 * cotAng[1]) / 8.0;
+					areaMixed[vb] += (d01 * cotAng[2] + d12 * cotAng[0]) / 8.0;
+					areaMixed[vc] += (d02 * cotAng[1] + d12 * cotAng[0]) / 8.0;
+				}
+				else {
+					// obtuse: area/2 at the obtuse corner, area/4 at the others
+					areaMixed[va] += (cotAng[0] < 0) ? areaT / 2.0 : areaT / 4.0;
+					areaMixed[vb] += (cotAng[1] < 0) ? areaT / 2.0 : areaT / 4.0;
+					areaMixed[vc] += (cotAng[2] < 0) ? areaT / 2.0 : areaT / 4.0;
+				}
+			}
+			for (i = 0; i < triMesh.vNum; i++)
+				triMesh.r[i] = (areaMixed[i] > DIST_THRES) ?
+					sqrt(lapX[i] * lapX[i] + lapY[i] * lapY[i] + lapZ[i] * lapZ[i]) / (4.0 * areaMixed[i]) : 0;
+			delete[] lapX; delete[] lapY; delete[] lapZ; delete[] areaMixed;
+		}
+#else
 		int publicIdx[2];
 		double l1[3], lPublic[3], l2[3], cross1[3], cross2[3], angle;
 		for (i = 0; i < triMesh.vNum; i++) {
@@ -883,6 +955,7 @@ inline void hexGen::ReadRawData(const char* inputFileName, const char* outputFil
 									break;
 								}
 		}
+#endif
 
 		triMesh.WriteToVtk(outputFileName, 1, START_POINT, 5, true);
 
