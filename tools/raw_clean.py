@@ -25,7 +25,8 @@ and reads.
 
 The input must pass raw_to_off.py's validation first.  A file with a bad
 header or a bad triangle is not cleaned.  A file with nothing to remove is
-left alone.
+left alone, unless --always asks for the four files anyway.  That gives
+every model a _cleaned set, including the models that were already clean.
 
 bone_tri_cleaned.* came from this tool.  Run on bone_tri.raw, it reproduces
 those four files byte for byte.
@@ -34,6 +35,7 @@ Usage
 -----
     python tools/raw_clean.py "input boundaries/bone_tri.raw"
     python tools/raw_clean.py "input boundaries/bone_tri.raw" --check   # report only
+    python tools/raw_clean.py "input boundaries"/*_tri.raw --always     # every model
 """
 import argparse
 import struct
@@ -114,15 +116,16 @@ def stl_write(*, path, vertices, faces, label):
                                   *pa, *pb, *pc, 0))
 
 
-def raw_clean(*, raw_path, check=False):
-    """Cleans one .raw file.  Returns the vertex and triangle counts, or None
-    when there is nothing to remove.  Raises ValueError on a failed validation."""
+def raw_clean(*, raw_path, check=False, always=False):
+    """Cleans one .raw file.  Returns the kept vertex count, the triangle
+    count, and the removed vertex count.  Returns None when there is nothing
+    to remove, unless always is set.  Raises ValueError on a failed validation."""
     problems = raw_validate(path=raw_path)
     if problems:
         raise ValueError("; ".join(problems))
     vertices, faces = raw_read(path=raw_path)
     kept, renumbered, dropped = vertices_prune(vertices=vertices, faces=faces)
-    if not dropped:
+    if not dropped and not always:
         return None
     for i in dropped:
         twins = [j for j, v in enumerate(vertices) if v == vertices[i] and j != i]
@@ -135,7 +138,7 @@ def raw_clean(*, raw_path, check=False):
         obj_write(path=stem.with_suffix(".obj"), vertices=kept, faces=renumbered)
         stl_write(path=stem.with_suffix(".stl"), vertices=kept, faces=renumbered,
                   label=f"{stem.name}.stl, from {stem.name}.raw")
-    return len(kept), len(renumbered)
+    return len(kept), len(renumbered), len(dropped)
 
 
 def main():
@@ -144,12 +147,14 @@ def main():
     parser.add_argument("paths", nargs="+", help="One or more .raw files")
     parser.add_argument("--check", action="store_true",
                         help="Report the unreferenced vertices; don't write any files")
+    parser.add_argument("--always", action="store_true",
+                        help="Write the _cleaned files even when nothing was removed")
     args = parser.parse_args()
 
     failures = []
     for raw_path in (Path(p).expanduser() for p in args.paths):
         try:
-            counts = raw_clean(raw_path=raw_path, check=args.check)
+            counts = raw_clean(raw_path=raw_path, check=args.check, always=args.always)
         except ValueError as e:
             print(f"SKIPPED {raw_path.name}: {e}", file=sys.stderr)
             failures.append(raw_path.name)
@@ -159,8 +164,8 @@ def main():
         elif args.check:
             print(f"{raw_path.name}: would keep {counts[0]} vertices, {counts[1]} triangles")
         else:
-            print(f"{raw_path.name}: {counts[0]} vertices, {counts[1]} triangles "
-                  f"-> {raw_path.stem}_cleaned.{{raw,off,obj,stl}}")
+            print(f"{raw_path.name}: {counts[0]} vertices, {counts[1]} triangles, "
+                  f"{counts[2]} removed -> {raw_path.stem}_cleaned.{{raw,off,obj,stl}}")
 
     if failures:
         print(f"\n{len(failures)} file(s) failed validation and were not cleaned: "
