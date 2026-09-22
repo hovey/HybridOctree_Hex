@@ -322,8 +322,8 @@ J
     \cdot
     (\mathbf{b} - \mathbf{x})
 \end{aligned}
-
 $$
+
 It will be convenient to define **edge vectors** as follows:
 
 $$\mathbf{u} := \mathbf{a} - \mathbf{x}$$
@@ -428,7 +428,7 @@ The can also be seen by using the gradient of the scalar triple product.  By app
 
 $$
 \nabla\_x J = 
-- (
+-(
 \mathbf{v} \times \mathbf{w} + 
 \mathbf{w} \times \mathbf{u} +
 \mathbf{u} \times \mathbf{v}
@@ -588,7 +588,7 @@ $$
 
 $$
 \nabla\_x L = 
-- \left(
+-\left(
     \Vert \mathbf{v}\Vert 
     \\;
     \Vert \mathbf{w}\Vert 
@@ -637,7 +637,7 @@ $$
 \nabla\_c \hat{J} &= \frac{\mathbf{n}\_{ab}}{L} - \frac{\hat{J} \hat{\mathbf{w}}}{\Vert \mathbf{w}\Vert }
 \\\\
 \nabla\_x \hat{J} &= 
-- \left[
+-\left[
     \left(
         \frac{\mathbf{n}\_{bc} + \mathbf{n}\_{ca} + \mathbf{n}\_{ab}}{L} 
     \right)
