@@ -69,8 +69,8 @@ Based on the [README.md](https://github.com/CMU-CBML/HybridOctree_Hex/blob/main/
 
 The octree is *refined* at regions of high curvature and narrow thickness.
 
-* **Curvature Detection:** Gaussian curvature $G$ is calculated for surface points.  Five thresholds $\\{0.5, 1, 2, 4, 8\\}$ are used.  If a cell at level $l+4$ satisfies $G > G_{\rm{thresh}}[l]$, it is refined to level $l+5$.
-* **Narrow Region Detection:** Thickness $T$ is measured via ray-casting.  If $T < T_{\rm{thresh}}$ (thresholds: $\\{16, 8, 4, 2, 1\\}$), the cell is refined.
+* **Curvature Detection:** Gaussian curvature $G$ is calculated for surface points.  Five thresholds $\\{0.5, 1, 2, 4, 8\\}$ are used.  If a cell at level $l+4$ satisfies $G > G\_{\rm{thresh}}[l]$, it is refined to level $l+5$.
+* **Narrow Region Detection:** Thickness $T$ is measured via ray-casting.  If $T < T\_{\rm{thresh}}$ (thresholds: $\\{16, 8, 4, 2, 1\\}$), the cell is refined.
 
 The resulting octree levels for each octant typically range from **level 5 to 9**.
 
@@ -112,26 +112,26 @@ If we were to keep every hex that is technically "inside" the target surface, so
 
 Let
 
-* $s_{\max}$ be the maximum size (typically as maximum edge length) of all elements sharing a vertex.
-* size threshold $\epsilon_s := s_{\max}/2$.
+* $s\_{\max}$ be the maximum size (typically as maximum edge length) of all elements sharing a vertex.
+* size threshold $\epsilon\_s := s\_{\max}/2$.
 
 Then,
 
-* **Vertex clearing rule:** If the minimum distance between from a vertex to the boundary falls below the size threshold $\epsilon_s$, all elements sharing that vertex are deleted.
+* **Vertex clearing rule:** If the minimum distance between from a vertex to the boundary falls below the size threshold $\epsilon\_s$, all elements sharing that vertex are deleted.
 
-By setting the threshold to half of the size of the largest local element ($s_{\max}/2$), the algorithm ensures that the "gap" (the buffer zone) is of substantial size.  This half-size rule effectively "erodes" the core mesh until there is a guaranteed clearance.  It also ensures that the final "buffer layer" hexes have a healthy aspect ratio (roughly $1:2$ or better) before the optimization begins.
+By setting the threshold to half of the size of the largest local element ($s\_{\max}/2$), the algorithm ensures that the "gap" (the buffer zone) is of substantial size.  This half-size rule effectively "erodes" the core mesh until there is a guaranteed clearance.  It also ensures that the final "buffer layer" hexes have a healthy aspect ratio (roughly $1:2$ or better) before the optimization begins.
 
 In short, clearing eliminates interior volume of the core mesh to make room for high-quality boundary hexes.  Without this elimination step, the mesh would likely fail in thin or high-curvature regions.
 
 ##### Signed Distance Function (SDF)
 
-The authors then noted, "During implementation, we observed that this setting [the **vertex clearing rule**] can be sensitive to large elements located in size transition regions, potentially leaving holes in the surface.  To address this issue, we calculate the signed distance function for corner points associated with every hex element.  Each hex had eight signed distance functions $f(\mathbf{x}_i)$, where $i=0, 1, 2 \ldots 7$.  We compute $f_{\min}$ and $f_{\max}$ and remove the hex element if the condition $f_{\min} + 0.1 \times f_{\max} < 0$ is met."
+The authors then noted, "During implementation, we observed that this setting [the **vertex clearing rule**] can be sensitive to large elements located in size transition regions, potentially leaving holes in the surface.  To address this issue, we calculate the signed distance function for corner points associated with every hex element.  Each hex had eight signed distance functions $f(\mathbf{x}\_i)$, where $i=0, 1, 2 \ldots 7$.  We compute $f\_{\min}$ and $f\_{\max}$ and remove the hex element if the condition $f\_{\min} + 0.1 \times f\_{\max} < 0$ is met."
 
 To illustrate this problem imagine a large hex sitting next to small hexes (a size transition).  If a single vertex of the large hex is flagged as "too close" to the target surface, the vertex clearing rule forces the deletion of the entire large hex.  Because the hex is large, a massive chunk of the model's interior gets deleted, leaving behind the smaller neighboring hexes that likely are unable to "fill" the gap easily, resulting in a hole or a broken surface of the final mesh.
 
 The authors replaced the brittle vertex clearing rule with the SDF result.  (Personal communication with Tong on 2026-02-24 indicates they used **both** the vertex clearing function and the signed distance function). While the vertex clearing rule removed everything based on a single vertex rule, the SDF considers all eight corners of a specific hex to decide if it should be eliminated or not.
 
-The weighted decision formula, $f_{\min} + 0.1 \times f_{\max} < 0$ acts as a soft-boundary filter.
+The weighted decision formula, $f\_{\min} + 0.1 \times f\_{\max} < 0$ acts as a soft-boundary filter.
 
 Let
 
@@ -178,13 +178,13 @@ where:
   * **On the surface:**
     * If $\mathbf{x}$ is on the surface, $\mathbf{x} = \mathbf{s}$, the distance is $\mathbf{0}$, and the dot product is zero, thus $f=0$.
 
-We remove a hex if $f_{\rm min} + 0.1 \times f_{\rm max} < 0$.
+We remove a hex if $f\_{\rm min} + 0.1 \times f\_{\rm max} < 0$.
 
 Note the definition of a signed distance must be reversed to keep the core and remove the outside.  There is a slight reversal in the standard mathematical definition of SDF and the removal formula in the paper.
 
 The paper cites [Paragios et al. 2002](https://link.springer.com/chapter/10.1007/3-540-47967-8_52), which likewise in Section 2 of their paper defines positive values to be **inside** the region $\mathcal{R}$ defined by shape $\mathcal{S}$; and negative values to be **outside** of the region $\mathcal{R}$.
 
-If one uses the standard mathematical definition ($f > 0$ is outside) with the paper's formula ($f_{\min} + 0.1 \times f_{\max} < 0$), one will delete the interior of the model and keep the empty air around it.
+If one uses the standard mathematical definition ($f > 0$ is outside) with the paper's formula ($f\_{\min} + 0.1 \times f\_{\max} < 0$), one will delete the interior of the model and keep the empty air around it.
 
 **Sign Reversal:**  For the paper's criterion to work as intended (to keep "core" and remove "outside"), the paper must be used with the **material convention**:
 
@@ -193,7 +193,7 @@ If one uses the standard mathematical definition ($f > 0$ is outside) with the p
 
 ###### Examples:
 
-The following example test the logic of the "material convention" (positive = inside), and illustrate why $f_{\min} + 0.1 \times f_{\max} < 0$ is so clever when positive is inside.
+The following example test the logic of the "material convention" (positive = inside), and illustrate why $f\_{\min} + 0.1 \times f\_{\max} < 0$ is so clever when positive is inside.
 
 * Scenario A: **Deeply Inside**
   * All 8 corner of the hex have $f \approx +10$.
@@ -202,10 +202,10 @@ The following example test the logic of the "material convention" (positive = in
   * All 8 corner of the hex have $f \approx -10$.
   * $-10 + 0.1(-10) = -11$.  Since $-11 < 0$ the hex is **removed**.
 * Scenario C: **Straddling (but mostly outside)**
-  * $f_{\min} = -5$ (far outside), $f_{\max} = +1$ (barely inside).
+  * $f\_{\min} = -5$ (far outside), $f\_{\max} = +1$ (barely inside).
   * $-5 + 0.1(1) = -4.9$.  Since $-4.9 < 0$, the hex is **removed**.
 * Scenario D: **Straddling (but mostly inside)**
-  * $f_{\min} = -0.5$ (barely outside), $f_{\max} = +10$ (deeply inside).
+  * $f\_{\min} = -0.5$ (barely outside), $f\_{\max} = +10$ (deeply inside).
   * $-0.5 + 0.1(10) = +0.5$.  Since 0.5 is **not** $< 0$, the hex is **retained**.
 
 **Insight:** The foregoing "weighted" rule allows a hex to stay even if a corner poke slightly out, as long as the rest of the hex is deeply buried inside.  This is exactly what prevents "holes" in size-transition regions.
@@ -220,9 +220,9 @@ Boundary point $\mathbf{x}$ to target surface $\mathbf{s}$
 * **Connectivity:** A boundary point $\mathbf{x}$ is shared by $m$ quadrilateral faces that form the external surface of the core mesh.
 * **Role in Meshing:** Every boundary point $\mathbf{x}$ is eventually connected to its closest point on the target surface $\mathbf{s}$ via an edge vector $(\mathbf{x} - \mathbf{s})$.  This connection ~~"stretches"~~ **augments** the mesh to fill in the buffer zone.
 
-The **normal vector** $n_i$ is defined as the normal of a triangle formed by boundary point $\mathbf{x}$ and two of its adjacent boundary points.
+The **normal vector** $n\_i$ is defined as the normal of a triangle formed by boundary point $\mathbf{x}$ and two of its adjacent boundary points.
 
-The **Restriction:** To prevent poor-quality elements when connecting to the target surface, a normal-based restriction is enforced.  For a boundary point $\mathbf{x}$, any three normals ($\mathbf{n}_i$, $\mathbf{n}_j$, $\mathbf{n}_k$) of the surrounding faces must satisfy $\left( \mathbf{n}_i \times \mathbf{n}_j \right) \cdot \mathbf{n}_k > 0$.
+The **Restriction:** To prevent poor-quality elements when connecting to the target surface, a normal-based restriction is enforced.  For a boundary point $\mathbf{x}$, any three normals ($\mathbf{n}\_i$, $\mathbf{n}\_j$, $\mathbf{n}\_k$) of the surrounding faces must satisfy $\left( \mathbf{n}\_i \times \mathbf{n}\_j \right) \cdot \mathbf{n}\_k > 0$.
 * **Iterative Removal:** Hexes are deleted one-by-one until all boundary points satisfy this geometric restriction.
 * This restriction guarantees that the remaining boundary points $\mathbf{x}$ have a geometry that guarantees a scaled Jacobian $> 0$ for the final boundary elements.
 * **Deletion Priority:** The algorithm prioritizes hexes with the **highest number of boundary faces** during buffer clearing to avoid creating internal holes.
@@ -234,23 +234,23 @@ The final step meshes the **buffer zone** by connecting core boundary points $\m
 * **Smart Laplacian Smoothing:** Performed every 1,000 iterations on the outermost two layers to speed up convergence.
 * **Energy Minimization:** A gradient-based method minimizes an energy function $E$:
 
-$$E := E_{\mathcal{S}}({\rm Geometry\\;Fitting}) - E_{\rm{J}}({\rm Jacobian}) - E_{\rm SJ}(\rm{Scaled\\;Jacobian})$$
+$$E := E\_{\mathcal{S}}({\rm Geometry\\;Fitting}) - E\_{\rm{J}}({\rm Jacobian}) - E\_{\rm SJ}(\rm{Scaled\\;Jacobian})$$
 
 or, more compactly,
 
-$$E := E_{\mathcal{S}} - E_{\rm J} - E_{\rm SJ}$$
+$$E := E\_{\mathcal{S}} - E\_{\rm J} - E\_{\rm SJ}$$
 
 or, more **explicitly**,
 
-$$E := E_{\mathcal{S}} - J - \hat{J}$$
+$$E := E\_{\mathcal{S}} - J - \hat{J}$$
 
 * **Jacobian Control:** Because the **Scaled Jacobian** is non-differentiable in certain regions, the algorithm switches to the **Jacobian** term for negative-Jacobian elements to ensure they can be *untangled*.
-* The paper specifically identifies $E_{\rm J}$ (the Jacobian term) as the mechanism to **untangle** elements with negative Jacobians.
+* The paper specifically identifies $E\_{\rm J}$ (the Jacobian term) as the mechanism to **untangle** elements with negative Jacobians.
 * Using a combined scaled Jacobian and Jacobian helps the optimizer not to get stuck in local minima.
 * The novel buffer zone clearance and mesh quality enhancements lead to significantly higher minimum scaled Jacobian $(> 0.5)$.
 * **Signage:** Since the goal is to minimize $E$, the two Jacobian-related terms are *subtracted* since the optimization is actually trying to **maximize** the Jacobian terms (improve mesh quality) while trying to **minimize** the distance between the mesh and the surface.
 
-#### Gradient $\nabla E_{\mathcal{S}}$
+#### Gradient $\nabla E\_{\mathcal{S}}$
 
 Let $\mathbf{x}$ be any vertex belonging to the boundary $\partial \Omega$ of the core mesh $\Omega$ composed of dual hexahedral elements. 
 
@@ -271,24 +271,24 @@ The objective of the *surface energy* is to characterize the gap energy between 
 Let this **surface energy mismatch** be defined as
 
 $$
-E_{\mathcal{S}} := \sum_{i=0}^{n_{\rm vert} - 1}
-\frac{ \Vert \mathbf{x}_i - \mathbf{s}_i \Vert }{2}^2
+E\_{\mathcal{S}} := \sum\_{i=0}^{n\_{\rm vert} - 1}
+\frac{ \Vert \mathbf{x}\_i - \mathbf{s}\_i \Vert }{2}^2
 $$
 
-for the $n_{\rm vert}$ surface vertices,
+for the $n\_{\rm vert}$ surface vertices,
 then
 the gradient at $\mathbf{x}$ is simply
 
 $$
-\nabla_{x_i} E_{\mathcal{S}} = \sum_{i=0}^{n_{\rm vert} - 1}
-( \mathbf{x}_i - \mathbf{s}_i )
+\nabla\_{x\_i} E\_{\mathcal{S}} = \sum\_{i=0}^{n\_{\rm vert} - 1}
+( \mathbf{x}\_i - \mathbf{s}\_i )
 $$
 
 The term acts as a *spring* that pulls the current vertex $\mathbf{x}$ toward its target surface position $\mathbf{s}$.
 
 #### Gradient $\nabla J$
 
-For any hexahedral element that has a negative Jacobian, we seek to maximize the Jacobian energy term, $E_{\rm J} = J$, which will tend to move the Jacobian from negative to positive (untangling).
+For any hexahedral element that has a negative Jacobian, we seek to maximize the Jacobian energy term, $E\_{\rm J} = J$, which will tend to move the Jacobian from negative to positive (untangling).
 
 For any hexahedral element, we evaluate the Jacobian at node $\mathbf{x}$.  We denote the three edge-sharing vertices as $\mathbf{a}, \mathbf{b}, \mathbf{c}$.
 
@@ -342,11 +342,11 @@ Finally, define a **vector area** of the faces meeting at node $\mathbf{x}$,
 
 $$
 \begin{align}
-\mathbf{n}_{ab} &:= \mathbf{u} \times \mathbf{v} 
+\mathbf{n}\_{ab} &:= \mathbf{u} \times \mathbf{v} 
 \\\\
-\mathbf{n}_{bc} &:= \mathbf{v} \times \mathbf{w}
+\mathbf{n}\_{bc} &:= \mathbf{v} \times \mathbf{w}
 \\\\
-\mathbf{n}_{ca} &:= \mathbf{w} \times \mathbf{u}
+\mathbf{n}\_{ca} &:= \mathbf{w} \times \mathbf{u}
 \end{align}
 $$
 
@@ -358,22 +358,22 @@ $[\mathbf{x}, \mathbf{c}, \mathbf{a}]$, respectively.
 Then, the Jacobian is defined as
 
 $$
-J := (\mathbf{n}_{ab} \times \mathbf{n}_{bc}) \cdot \mathbf{n}_{ca}
-= (\mathbf{n}_{bc} \times \mathbf{n}_{ca}) \cdot \mathbf{n}_{ab}
-= (\mathbf{n}_{ca} \times \mathbf{n}_{ab}) \cdot \mathbf{n}_{bc}
+J := (\mathbf{n}\_{ab} \times \mathbf{n}\_{bc}) \cdot \mathbf{n}\_{ca}
+= (\mathbf{n}\_{bc} \times \mathbf{n}\_{ca}) \cdot \mathbf{n}\_{ab}
+= (\mathbf{n}\_{ca} \times \mathbf{n}\_{ab}) \cdot \mathbf{n}\_{bc}
 $$
 
-##### Partial Gradient $\nabla_a J$
+##### Partial Gradient $\nabla\_a J$
 
 By inspection of the second form of the preceding definition, the gradient of $J$ with respect to $\mathbf{a}$ is simply
 
 $$
-\nabla_a J = 
+\nabla\_a J = 
     (\mathbf{b} - \mathbf{x}) 
     \times
     (\mathbf{c} - \mathbf{x})
 = \mathbf{v} \times \mathbf{w}
-= \mathbf{n}_{bc}
+= \mathbf{n}\_{bc}
 $$
 
 Since $(\mathbf{b} - \mathbf{x}) \times (\mathbf{c} - \mathbf{x})$ is the normal vector to the face formed by $\mathbf{x}, \mathbf{a}, \mathbf{b}$, the
@@ -382,52 +382,52 @@ direction.
 
 Similar expressions can be found for gradients with respect to $\mathbf{b}$ and $\mathbf{c}$
 
-##### Partial Gradient $\nabla_b J$
+##### Partial Gradient $\nabla\_b J$
 
 $$
-\nabla_b J = 
+\nabla\_b J = 
     (\mathbf{c} - \mathbf{x}) 
     \times
     (\mathbf{a} - \mathbf{x})
 = \mathbf{w} \times \mathbf{u}
-= \mathbf{n}_{ca}
+= \mathbf{n}\_{ca}
 $$
 
-##### Partial Gradient $\nabla_c J$
+##### Partial Gradient $\nabla\_c J$
 
 $$
-\nabla_c J = 
+\nabla\_c J = 
     (\mathbf{a} - \mathbf{x}) 
     \times
     (\mathbf{b} - \mathbf{x})
 = \mathbf{u} \times \mathbf{v}
-= \mathbf{n}_{ab}
+= \mathbf{n}\_{ab}
 $$
 
 > **Physical interpretation:** The volume (i.e., the Jacobian) increases when a particular node ($\mathbf{a},$ $\mathbf{b},$ or $\mathbf{c}$) moves away from the other three remaining nodes in a direction that is perpendicular to the face created by the those three remaining nodes.
 
-##### Partial Gradient $\nabla_x J$
+##### Partial Gradient $\nabla\_x J$
 
 The gradient with respect to $\mathbf{x}$ can be seen by inspection of the three preceding gradients, with a flip of the sign and use of the chain rule,
 
 $$
-\nabla_x J = - (\nabla_a J + \nabla_b J + \nabla_c J)
+\nabla\_x J = - (\nabla\_a J + \nabla\_b J + \nabla\_c J)
 $$
 
 The gradient is simply the negative sum of these three face normals:
 
-$$\nabla_x J = 
+$$\nabla\_x J = 
 -(
-  \mathbf{n}_{bc} +
-  \mathbf{n}_{ca} +
-  \mathbf{n}_{ab}
+  \mathbf{n}\_{bc} +
+  \mathbf{n}\_{ca} +
+  \mathbf{n}\_{ab}
 )
 $$
 
 The can also be seen by using the gradient of the scalar triple product.  By applying the product rule for cross and dot products, we find:
 
 $$
-\nabla_x J = 
+\nabla\_x J = 
 - (
 \mathbf{v} \times \mathbf{w} + 
 \mathbf{w} \times \mathbf{u} +
@@ -441,9 +441,9 @@ which is the same result.
 
 #### Gradient $\nabla \hat{J}$
 
-For any hex elements that have a **positive Jacobian**, we seek to maximize the scaled Jacobian energy term, $E_{\rm SJ} = \hat{J}$, which will drive the MSJ toward their maximum value of unity.
+For any hex elements that have a **positive Jacobian**, we seek to maximize the scaled Jacobian energy term, $E\_{\rm SJ} = \hat{J}$, which will drive the MSJ toward their maximum value of unity.
 
-Once the hexes transition from negative to positive Jacobian (they thus become untangled, $J > 0$), we cease using these hexes the $E_{\rm J}$ term, considering them instead as participants in the $E_{\rm SJ}$ term.
+Once the hexes transition from negative to positive Jacobian (they thus become untangled, $J > 0$), we cease using these hexes the $E\_{\rm J}$ term, considering them instead as participants in the $E\_{\rm SJ}$ term.
 
 The normalized version of the Jacobian, the **scaled Jacobian** is defined as
 
@@ -518,37 +518,37 @@ $$
 Thus, the gradients for each of the four nodes,
 
 $$
-\nabla_a \hat{J} = 
+\nabla\_a \hat{J} = 
 \frac{
 \left(
-\nabla_a J \\; L \\;-\\; J \\; \nabla_a L
+\nabla\_a J \\; L \\;-\\; J \\; \nabla\_a L
 \right)
 }{L^2}
 $$
 
 $$
-\nabla_b \hat{J} = 
+\nabla\_b \hat{J} = 
 \frac{
 \left(
-\nabla_b J \\; L \\;-\\; J \\; \nabla_b L
+\nabla\_b J \\; L \\;-\\; J \\; \nabla\_b L
 \right)
 }{L^2}
 $$
 
 $$
-\nabla_c \hat{J} = 
+\nabla\_c \hat{J} = 
 \frac{
 \left(
-\nabla_c J \\; L \\;-\\; J \\; \nabla_c L
+\nabla\_c J \\; L \\;-\\; J \\; \nabla\_c L
 \right)
 }{L^2}
 $$
 
 $$
-\nabla_x \hat{J} = 
+\nabla\_x \hat{J} = 
 \frac{
 \left(
-\nabla_x J \\; L \\;-\\; J \\; \nabla_x L
+\nabla\_x J \\; L \\;-\\; J \\; \nabla\_x L
 \right)
 }{L^2}
 $$
@@ -557,7 +557,7 @@ where the length gradient terms are:
 
 
 $$
-\nabla_a L = 
+\nabla\_a L = 
     \Vert \mathbf{v}\Vert 
     \\;
     \Vert \mathbf{w}\Vert 
@@ -567,7 +567,7 @@ $$
 $$
 
 $$
-\nabla_b L = 
+\nabla\_b L = 
     \Vert \mathbf{w}\Vert 
     \\;
     \Vert \mathbf{u}\Vert 
@@ -577,7 +577,7 @@ $$
 $$
 
 $$
-\nabla_c L = 
+\nabla\_c L = 
     \Vert \mathbf{u}\Vert 
     \\;
     \Vert \mathbf{v}\Vert 
@@ -587,7 +587,7 @@ $$
 $$
 
 $$
-\nabla_x L = 
+\nabla\_x L = 
 - \left(
     \Vert \mathbf{v}\Vert 
     \\;
@@ -630,16 +630,16 @@ Then,
 
 $$
 \begin{align}
-\nabla_a \hat{J} &= \frac{\mathbf{n}_{bc}}{L} - \frac{\hat{J} \hat{\mathbf{u}}}{\Vert \mathbf{u}\Vert }
+\nabla\_a \hat{J} &= \frac{\mathbf{n}\_{bc}}{L} - \frac{\hat{J} \hat{\mathbf{u}}}{\Vert \mathbf{u}\Vert }
 \\\\
-\nabla_b \hat{J} &= \frac{\mathbf{n}_{ca}}{L} - \frac{\hat{J} \hat{\mathbf{v}}}{\Vert \mathbf{v}\Vert }
+\nabla\_b \hat{J} &= \frac{\mathbf{n}\_{ca}}{L} - \frac{\hat{J} \hat{\mathbf{v}}}{\Vert \mathbf{v}\Vert }
 \\\\
-\nabla_c \hat{J} &= \frac{\mathbf{n}_{ab}}{L} - \frac{\hat{J} \hat{\mathbf{w}}}{\Vert \mathbf{w}\Vert }
+\nabla\_c \hat{J} &= \frac{\mathbf{n}\_{ab}}{L} - \frac{\hat{J} \hat{\mathbf{w}}}{\Vert \mathbf{w}\Vert }
 \\\\
-\nabla_x \hat{J} &= 
+\nabla\_x \hat{J} &= 
 - \left[
     \left(
-        \frac{\mathbf{n}_{bc} + \mathbf{n}_{ca} + \mathbf{n}_{ab}}{L} 
+        \frac{\mathbf{n}\_{bc} + \mathbf{n}\_{ca} + \mathbf{n}\_{ab}}{L} 
     \right)
     - \hat{J}
     \left(
@@ -782,12 +782,12 @@ The **scaled Jacobian** is a *nonlinear* function because the denominator contai
 
 The above plot explores node $\mathbf{x}$ moving along a line parameterized by time $t$ as:
 
-$$\mathbf{x}(t) = \mathbf{x}_0 + t \mathbf{d}$$
+$$\mathbf{x}(t) = \mathbf{x}\_0 + t \mathbf{d}$$
 
-where $\mathbf{d}$ is an arbitrary direction and $\mathbf{x}_0$ = $\mathbf{0}$, and the Jacobian functions take the forms
+where $\mathbf{d}$ is an arbitrary direction and $\mathbf{x}\_0$ = $\mathbf{0}$, and the Jacobian functions take the forms
 
-* $J(t) = C_1 + C_2 \\; t$ a linear function,
-* $\hat{J}(t) = \frac{C_1 + C_2\\;t}{\sqrt{Q_1(t) Q_2(t) Q_3(t)}}$ a nonlinear curve, where $Q$ are quadratic polynomials
+* $J(t) = C\_1 + C\_2 \\; t$ a linear function,
+* $\hat{J}(t) = \frac{C\_1 + C\_2\\;t}{\sqrt{Q\_1(t) Q\_2(t) Q\_3(t)}}$ a nonlinear curve, where $Q$ are quadratic polynomials
 
 #### Plot of Jacobian and Scaled Jacobian - Monte Carlo
 
@@ -809,7 +809,7 @@ The Piecewise Energy Function is defined based on the Jacobian value being posit
 One can define the quality energy for a single hexahedron $h$ by checking the sign of its Jacobian $J$. This ensures that "tangled" (inverted) elements are prioritized for unfolding before they are refined for shape quality.
 
 $$
-E_Q(h) = 
+E\_Q(h) = 
 \begin{cases} 
 -\hat{J}(h) & \text{if } J(h) > \epsilon \quad {\rm positive/smoothing}\\\\
 -J(h) & \text{if } J(h) \leq \epsilon \quad {\rm negative/untangling}
@@ -818,7 +818,7 @@ $$
 
 where
 
-* $E_Q(h)$ is the quality energy for a single hex $h$.
+* $E\_Q(h)$ is the quality energy for a single hex $h$.
 * $J(h)$ is the standard Jacobian (signed volume).
 * $\hat{J}(h)$ is the scaled Jacobian (normalized shape metric).
 * $\epsilon$ is a small positive tolerance (e.g., $10^{-6}$) used to identify inverted or degenerated elements.
@@ -829,7 +829,7 @@ Since gradient descent minimizes energy, we subtract the quality metric to maxim
 
 To compute the Hessians for the Jacobian $J$ and Scaled Jacobian $\hat{J}$, we must take the second partial derivatives of the energy terms.
 
-### Hessian of the Jacobian $\mathbf{H}_J$
+### Hessian of the Jacobian $\mathbf{H}\_J$
 
 The Jacobian $J$ is **bilinear** with respect to any two distinct vertices.
 This means its second derivative with respect to the *same* node is zero; only the
@@ -838,26 +838,26 @@ cross-derivatives are non-zero.
 Let
 
 $$
-\mathbf{H}_{mn} = \frac{\partial^2 J}{\partial \mathbf{m} \partial \mathbf{n}}
+\mathbf{H}\_{mn} = \frac{\partial^2 J}{\partial \mathbf{m} \partial \mathbf{n}}
 $$
 
 Because $J$ is linear with respect to any single node position (when the others are fixed):
 
 $$
-\mathbf{H}_{aa} = \mathbf{H}_{bb} = \mathbf{H}_{cc} = \mathbf{H}_{xx} = \mathbf{0}_{3 \times 3}
+\mathbf{H}\_{aa} = \mathbf{H}\_{bb} = \mathbf{H}\_{cc} = \mathbf{H}\_{xx} = \mathbf{0}\_{3 \times 3}
 $$
 
 The **cross-node Hessians** are essentially the derivatives of the face normals.  
-For example, to find $\mathbf{H}_{ab}$:
+For example, to find $\mathbf{H}\_{ab}$:
 
 $$
-\nabla_a J = (\mathbf{b} - \mathbf{x}) \times (\mathbf{c} - \mathbf{x})
+\nabla\_a J = (\mathbf{b} - \mathbf{x}) \times (\mathbf{c} - \mathbf{x})
 $$
 
 $$
 \frac{\partial}{\partial \mathbf{b}}
 \left(
-\nabla_a J
+\nabla\_a J
 \right)
 = \frac{\partial}{\partial \mathbf{b}}
 \left[
@@ -874,41 +874,41 @@ Using the property of the cross product,
 $$
 \frac{\partial}{\partial \bullet} \left(\bullet \times \mathbf{k}\right) = 
 \left[
-\mathbf{k}\right]_{\times}
+\mathbf{k}\right]\_{\times}
 $$
 
-where $[\mathbf{k}]_{\times}$ is a skew-symmetric matrix, we obtain
+where $[\mathbf{k}]\_{\times}$ is a skew-symmetric matrix, we obtain
 
 $$
 \begin{align}
-\mathbf{H}_{bc} = \left[\mathbf{u}\right]_{\times} \quad \quad
-\mathbf{H}_{cb} = - \left[\mathbf{u}\right]_{\times}
+\mathbf{H}\_{bc} = \left[\mathbf{u}\right]\_{\times} \quad \quad
+\mathbf{H}\_{cb} = - \left[\mathbf{u}\right]\_{\times}
 \\\\
-\mathbf{H}_{ca} = \left[\mathbf{v}\right]_{\times} \quad \quad
-\mathbf{H}_{ac} = -\left[\mathbf{v}\right]_{\times}
+\mathbf{H}\_{ca} = \left[\mathbf{v}\right]\_{\times} \quad \quad
+\mathbf{H}\_{ac} = -\left[\mathbf{v}\right]\_{\times}
 \\\\
-\mathbf{H}_{ab} = \left[\mathbf{w}\right]_{\times} \quad \quad
-\mathbf{H}_{ba} = -\left[\mathbf{w}\right]_{\times}
+\mathbf{H}\_{ab} = \left[\mathbf{w}\right]\_{\times} \quad \quad
+\mathbf{H}\_{ba} = -\left[\mathbf{w}\right]\_{\times}
 \\\\
-\mathbf{H}_{ax} = \left[\mathbf{w}\right]_{\times} - \left[\mathbf{v}\right]_{\times} \quad \quad
-\mathbf{H}_{xa} = \left[\mathbf{v}\right]_{\times} - \left[\mathbf{w}\right]_{\times}
+\mathbf{H}\_{ax} = \left[\mathbf{w}\right]\_{\times} - \left[\mathbf{v}\right]\_{\times} \quad \quad
+\mathbf{H}\_{xa} = \left[\mathbf{v}\right]\_{\times} - \left[\mathbf{w}\right]\_{\times}
 \\\\
-\mathbf{H}_{bx} = \left[\mathbf{u}\right]_{\times} - \left[\mathbf{w}\right]_{\times} \quad \quad
-\mathbf{H}_{xb} = \left[\mathbf{w}\right]_{\times} - \left[\mathbf{u}\right]_{\times}
+\mathbf{H}\_{bx} = \left[\mathbf{u}\right]\_{\times} - \left[\mathbf{w}\right]\_{\times} \quad \quad
+\mathbf{H}\_{xb} = \left[\mathbf{w}\right]\_{\times} - \left[\mathbf{u}\right]\_{\times}
 \\\\
-\mathbf{H}_{cx} = \left[\mathbf{v}\right]_{\times} - \left[\mathbf{u}\right]_{\times} \quad \quad
-\mathbf{H}_{xc} = \left[\mathbf{u}\right]_{\times} - \left[\mathbf{v}\right]_{\times}
+\mathbf{H}\_{cx} = \left[\mathbf{v}\right]\_{\times} - \left[\mathbf{u}\right]\_{\times} \quad \quad
+\mathbf{H}\_{xc} = \left[\mathbf{u}\right]\_{\times} - \left[\mathbf{v}\right]\_{\times}
 \end{align}
 $$
 
-### Hessian of the Scaled Jacobian $\mathbf{H}_{\hat{J}}$
+### Hessian of the Scaled Jacobian $\mathbf{H}\_{\hat{J}}$
 
 For the Scaled Jacobian $\hat{J} = J / L$, the cross-Hessians with $\mathbf{x}$ require cross-gradients of the length product $L$.
 
-The term $\mathbf{H}_{L,ax}$ is
+The term $\mathbf{H}\_{L,ax}$ is
 
 $$
-\mathbf{H}_{L,ax} = \frac{\partial}{\partial \mathbf{x}}
+\mathbf{H}\_{L,ax} = \frac{\partial}{\partial \mathbf{x}}
 \left(
     \Vert \mathbf{v} \Vert 
     \Vert \mathbf{w} \Vert 
@@ -920,19 +920,19 @@ Since $\mathbf{x}$ appears in the denominator and numerator of the unit vector
 $\hat{\mathbf{u}} = \frac{\mathbf{a} - \mathbf{x}}{\Vert \mathbf{a} - \mathbf{x} \Vert }$, the following results,
 
 $$
-\mathbf{H}_{L,ax} = 
+\mathbf{H}\_{L,ax} = 
 -\frac{\Vert \mathbf{v} \Vert \\; \Vert \mathbf{w} \Vert }{\Vert \mathbf{u} \Vert }
 \left[
 \mathbf{I} - \hat{\mathbf{u}} \hat{\mathbf{u}}^T
 \right]
 $$
 
-> **Note on Symmetry:** In a valid energy formulation, the Hessian must be symmetric.  For the Jacobian $J$, because the skew-symmetry, $\left[\mathbf{\bullet}\right]_{\times}$ is anti-symmetric, $\left[\bullet \right]^T_{\times} = - \left[\bullet\right]_{\times}$.  These interactions provide a *twist* (i.e., a torque) that untangles the element when one nodes moves relative to the others.
+> **Note on Symmetry:** In a valid energy formulation, the Hessian must be symmetric.  For the Jacobian $J$, because the skew-symmetry, $\left[\mathbf{\bullet}\right]\_{\times}$ is anti-symmetric, $\left[\bullet \right]^T\_{\times} = - \left[\bullet\right]\_{\times}$.  These interactions provide a *twist* (i.e., a torque) that untangles the element when one nodes moves relative to the others.
 
 ## References
 
 * Rousson M, Paragios N. Shape priors for level set representations. In European Conference on Computer Vision 2002 Apr 29 (pp. 78-92). Berlin, Heidelberg: Springer Berlin Heidelberg.  https://link.springer.com/chapter/10.1007/3-540-47967-8_6
 * Signed Distance Functions and Ray-Marching, https://youtu.be/hX3mazz8txo?si=O7Ee81LF2REuf9WV
-* Tong H, Halilaj E, Zhang YJ. HybridOctree_Hex: Hybrid octree-based adaptive all-hexahedral mesh generation with Jacobian control. Journal of Computational Science. 2024 Jun 1;78:102278.  https://doi.org/10.1016/j.jocs.2024.102278
+* Tong H, Halilaj E, Zhang YJ. HybridOctree\_Hex: Hybrid octree-based adaptive all-hexahedral mesh generation with Jacobian control. Journal of Computational Science. 2024 Jun 1;78:102278.  https://doi.org/10.1016/j.jocs.2024.102278
 * Zhang Y, Liang X, Xu G. A robust 2-refinement algorithm in octree or rhombic dodecahedral tree based all-hexahedral mesh generation. Computer Methods in Applied Mechanics and Engineering. 2013 Apr 1;256:88-100.  https://doi.org/10.1016/j.cma.2012.12.020
 * Zhang Y, Bajaj C. Adaptive and quality quadrilateral/hexahedral meshing from volumetric data. Computer methods in applied mechanics and engineering. 2006 Feb 1;195(9-12):942-60.  https://doi.org/10.1016/j.cma.2005.02.016
