@@ -588,8 +588,7 @@ $$
 
 $$
 \nabla_x L = 
--
-\left(
+- \left(
     \|\mathbf{v}\|
     \;
     \|\mathbf{w}\|
@@ -642,8 +641,7 @@ $$
     \left(
         \frac{\mathbf{n}_{bc} + \mathbf{n}_{ca} + \mathbf{n}_{ab}}{L} 
     \right)
-    -
-    \hat{J}
+    - \hat{J}
     \left(
         \frac{\hat{\mathbf{u}}}{\|\mathbf{u}\|}
         +
@@ -846,15 +844,7 @@ $$
 Because $J$ is linear with respect to any single node position (when the others are fixed):
 
 $$
-\mathbf{H}_{aa} 
-= 
-\mathbf{H}_{bb} 
-= 
-\mathbf{H}_{cc} 
-= 
-\mathbf{H}_{xx} 
-=
-\mathbf{0}_{3 \times 3}
+\mathbf{H}_{aa} = \mathbf{H}_{bb} = \mathbf{H}_{cc} = \mathbf{H}_{xx} = \mathbf{0}_{3 \times 3}
 $$
 
 The **cross-node Hessians** are essentially the derivatives of the face normals.  
