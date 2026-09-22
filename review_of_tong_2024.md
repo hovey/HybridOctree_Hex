@@ -169,7 +169,7 @@ $$
 
 where:
 
-* The **magnitude** $\Vert \mathbf{x} - \mathbf{s} \Vert $ is the shortest Euclidean distance from the query point to the manifold.  It is always non-negative.
+* The **magnitude** $\Vert \mathbf{x} - \mathbf{s} \Vert$ is the shortest Euclidean distance from the query point to the manifold.  It is always non-negative.
 * The **direction vector** $(\mathbf{x} - \mathbf{s})$ points from the closest point on the surface to the query point.
   * **Outside the surface:**
     * If the query point $\mathbf{x}$ lies outside of the surface, the vector $(\mathbf{x} - \mathbf{s})$ points opposite of the surface inward normal ~~in the same general direction as the surface outward normal~~ $\mathbf{n}(\mathbf{s})$, making the dot product negative and $f < 0$.
@@ -653,7 +653,7 @@ $$
 \end{align}
 $$
 
-> **Physical interpretation:** The first term, $\mathbf{n}/L$, is an **orthogonality force** that pushes the node to make the corner more orthogonal.  The second term, $\hat{J}\hat{\mathbf{\bullet}}/\Vert \mathbf{\bullet}\Vert $, is an **aspect ratio constraint**.  It prevents numerical inflation of the Scaled Jacobian through the elongation of a localized edge vector.
+> **Physical interpretation:** The first term, $\mathbf{n}/L$, is an **orthogonality force** that pushes the node to make the corner more orthogonal.  The second term, $\hat{J}\hat{\mathbf{\bullet}}/\Vert \mathbf{\bullet}\Vert$, is an **aspect ratio constraint**.  It prevents numerical inflation of the Scaled Jacobian through the elongation of a localized edge vector.
 
 #### Gradient Descent
 
