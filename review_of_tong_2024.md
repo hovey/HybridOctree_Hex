@@ -164,12 +164,12 @@ f(\mathbf{x}) =
     \cdot
     (\mathbf{x} - \mathbf{s})
 \right] 
-\|\mathbf{x} - \mathbf{s} \|
+\Vert \mathbf{x} - \mathbf{s} \Vert 
 $$
 
 where:
 
-* The **magnitude** $\| \mathbf{x} - \mathbf{s} \|$ is the shortest Euclidean distance from the query point to the manifold.  It is always non-negative.
+* The **magnitude** $\Vert \mathbf{x} - \mathbf{s} \Vert $ is the shortest Euclidean distance from the query point to the manifold.  It is always non-negative.
 * The **direction vector** $(\mathbf{x} - \mathbf{s})$ points from the closest point on the surface to the query point.
   * **Outside the surface:**
     * If the query point $\mathbf{x}$ lies outside of the surface, the vector $(\mathbf{x} - \mathbf{s})$ points opposite of the surface inward normal ~~in the same general direction as the surface outward normal~~ $\mathbf{n}(\mathbf{s})$, making the dot product negative and $f < 0$.
@@ -272,7 +272,7 @@ Let this **surface energy mismatch** be defined as
 
 $$
 E_{\mathcal{S}} := \sum_{i=0}^{n_{\rm vert} - 1}
-\frac{ \|\mathbf{x}_i - \mathbf{s}_i \| }{2}^2
+\frac{ \Vert \mathbf{x}_i - \mathbf{s}_i \Vert }{2}^2
 $$
 
 for the $n_{\rm vert}$ surface vertices,
@@ -458,11 +458,11 @@ $$
     \cdot
     (\mathbf{c} - \mathbf{x})
     }{
-    \|\mathbf{a} - \mathbf{x}\|
+    \Vert \mathbf{a} - \mathbf{x}\Vert 
     \;
-    \|\mathbf{b} - \mathbf{x}\|
+    \Vert \mathbf{b} - \mathbf{x}\Vert 
     \;
-    \|\mathbf{c} - \mathbf{x}\|
+    \Vert \mathbf{c} - \mathbf{x}\Vert 
     }
 $$
 
@@ -471,11 +471,11 @@ or, using the edge vector definitions defined previously,
 $$
 \hat{J} :=
 \frac{(\mathbf{u} \times \mathbf{v}) \cdot \mathbf{w}}{
-    \|\mathbf{u}\|
+    \Vert \mathbf{u}\Vert 
     \;
-    \|\mathbf{v}\|
+    \Vert \mathbf{v}\Vert 
     \;
-    \|\mathbf{w}\|
+    \Vert \mathbf{w}\Vert 
 }
 $$
 
@@ -483,11 +483,11 @@ The gradient requires the **quotient rule** to account for the changing edge len
 
 $$
 L :=
-    \|\mathbf{u}\|
+    \Vert \mathbf{u}\Vert 
     \;
-    \|\mathbf{v}\|
+    \Vert \mathbf{v}\Vert 
     \;
-    \|\mathbf{w}\|
+    \Vert \mathbf{w}\Vert 
 $$
 
 which is the product of the three lengths.  Then
@@ -495,11 +495,11 @@ which is the product of the three lengths.  Then
 $$
 \hat{J} :=
 \frac{(\mathbf{u} \times \mathbf{v}) \cdot \mathbf{w}}{
-    \|\mathbf{u}\|
+    \Vert \mathbf{u}\Vert 
     \;
-    \|\mathbf{v}\|
+    \Vert \mathbf{v}\Vert 
     \;
-    \|\mathbf{w}\|
+    \Vert \mathbf{w}\Vert 
 }
 = \frac{J}{L}
 $$
@@ -558,57 +558,57 @@ where the length gradient terms are:
 
 $$
 \nabla_a L = 
-    \|\mathbf{v}\|
+    \Vert \mathbf{v}\Vert 
     \;
-    \|\mathbf{w}\|
+    \Vert \mathbf{w}\Vert 
     \;
     \frac{\mathbf{u}}{
-    \|\mathbf{u}\|}
+    \Vert \mathbf{u}\Vert }
 $$
 
 $$
 \nabla_b L = 
-    \|\mathbf{w}\|
+    \Vert \mathbf{w}\Vert 
     \;
-    \|\mathbf{u}\|
+    \Vert \mathbf{u}\Vert 
     \;
     \frac{\mathbf{v}}{
-    \|\mathbf{v}\|}
+    \Vert \mathbf{v}\Vert }
 $$
 
 $$
 \nabla_c L = 
-    \|\mathbf{u}\|
+    \Vert \mathbf{u}\Vert 
     \;
-    \|\mathbf{v}\|
+    \Vert \mathbf{v}\Vert 
     \;
     \frac{\mathbf{w}}{
-    \|\mathbf{w}\|}
+    \Vert \mathbf{w}\Vert }
 $$
 
 $$
 \nabla_x L = 
 - \left(
-    \|\mathbf{v}\|
+    \Vert \mathbf{v}\Vert 
     \;
-    \|\mathbf{w}\|
+    \Vert \mathbf{w}\Vert 
     \;
     \frac{\mathbf{u}}{
-    \|\mathbf{u}\|}
+    \Vert \mathbf{u}\Vert }
 +
-    \|\mathbf{w}\|
+    \Vert \mathbf{w}\Vert 
     \;
-    \|\mathbf{u}\|
+    \Vert \mathbf{u}\Vert 
     \;
     \frac{\mathbf{v}}{
-    \|\mathbf{v}\|}
+    \Vert \mathbf{v}\Vert }
 +
-    \|\mathbf{u}\|
+    \Vert \mathbf{u}\Vert 
     \;
-    \|\mathbf{v}\|
+    \Vert \mathbf{v}\Vert 
     \;
     \frac{\mathbf{w}}{
-    \|\mathbf{w}\|}
+    \Vert \mathbf{w}\Vert }
 \right)
 $$
 
@@ -619,22 +619,22 @@ Like the Jacobian, the scaled Jacobian and its gradient can be calculated for ea
 First, precompute
 
 $$
-\hat{\mathbf{u}} = \frac{\mathbf{u}}{\|\mathbf{u}\|},
+\hat{\mathbf{u}} = \frac{\mathbf{u}}{\Vert \mathbf{u}\Vert },
 \quad
-\hat{\mathbf{v}} = \frac{\mathbf{v}}{\|\mathbf{v}\|},
+\hat{\mathbf{v}} = \frac{\mathbf{v}}{\Vert \mathbf{v}\Vert },
 \quad
-\hat{\mathbf{w}} = \frac{\mathbf{w}}{\|\mathbf{w}\|},
+\hat{\mathbf{w}} = \frac{\mathbf{w}}{\Vert \mathbf{w}\Vert },
 $$
 
 Then,
 
 $$
 \begin{align}
-\nabla_a \hat{J} &= \frac{\mathbf{n}_{bc}}{L} - \frac{\hat{J} \hat{\mathbf{u}}}{\|\mathbf{u}\|}
+\nabla_a \hat{J} &= \frac{\mathbf{n}_{bc}}{L} - \frac{\hat{J} \hat{\mathbf{u}}}{\Vert \mathbf{u}\Vert }
 \\
-\nabla_b \hat{J} &= \frac{\mathbf{n}_{ca}}{L} - \frac{\hat{J} \hat{\mathbf{v}}}{\|\mathbf{v}\|}
+\nabla_b \hat{J} &= \frac{\mathbf{n}_{ca}}{L} - \frac{\hat{J} \hat{\mathbf{v}}}{\Vert \mathbf{v}\Vert }
 \\
-\nabla_c \hat{J} &= \frac{\mathbf{n}_{ab}}{L} - \frac{\hat{J} \hat{\mathbf{w}}}{\|\mathbf{w}\|}
+\nabla_c \hat{J} &= \frac{\mathbf{n}_{ab}}{L} - \frac{\hat{J} \hat{\mathbf{w}}}{\Vert \mathbf{w}\Vert }
 \\
 \nabla_x \hat{J} &= 
 - \left[
@@ -643,17 +643,17 @@ $$
     \right)
     - \hat{J}
     \left(
-        \frac{\hat{\mathbf{u}}}{\|\mathbf{u}\|}
+        \frac{\hat{\mathbf{u}}}{\Vert \mathbf{u}\Vert }
         +
-        \frac{\hat{\mathbf{v}}}{\|\mathbf{v}\|}
+        \frac{\hat{\mathbf{v}}}{\Vert \mathbf{v}\Vert }
         +
-        \frac{\hat{\mathbf{w}}}{\|\mathbf{w}\|}
+        \frac{\hat{\mathbf{w}}}{\Vert \mathbf{w}\Vert }
     \right)
 \right]
 \end{align}
 $$
 
-> **Physical interpretation:** The first term, $\mathbf{n}/L$, is an **orthogonality force** that pushes the node to make the corner more orthogonal.  The second term, $\hat{J}\hat{\mathbf{\bullet}}/\|\mathbf{\bullet}\|$, is an **aspect ratio constraint**.  It prevents numerical inflation of the Scaled Jacobian through the elongation of a localized edge vector.
+> **Physical interpretation:** The first term, $\mathbf{n}/L$, is an **orthogonality force** that pushes the node to make the corner more orthogonal.  The second term, $\hat{J}\hat{\mathbf{\bullet}}/\Vert \mathbf{\bullet}\Vert $, is an **aspect ratio constraint**.  It prevents numerical inflation of the Scaled Jacobian through the elongation of a localized edge vector.
 
 #### Gradient Descent
 
@@ -910,18 +910,18 @@ The term $\mathbf{H}_{L,ax}$ is
 $$
 \mathbf{H}_{L,ax} = \frac{\partial}{\partial \mathbf{x}}
 \left(
-    \| \mathbf{v} \|
-    \| \mathbf{w} \|
+    \Vert \mathbf{v} \Vert 
+    \Vert \mathbf{w} \Vert 
     \hat{\mathbf{u}}
 \right)
 $$
 
 Since $\mathbf{x}$ appears in the denominator and numerator of the unit vector
-$\hat{\mathbf{u}} = \frac{\mathbf{a} - \mathbf{x}}{\|\mathbf{a} - \mathbf{x} \|}$, the following results,
+$\hat{\mathbf{u}} = \frac{\mathbf{a} - \mathbf{x}}{\Vert \mathbf{a} - \mathbf{x} \Vert }$, the following results,
 
 $$
 \mathbf{H}_{L,ax} = 
--\frac{\| \mathbf{v} \| \; \| \mathbf{w} \|}{\| \mathbf{u} \|}
+-\frac{\Vert \mathbf{v} \Vert \; \Vert \mathbf{w} \Vert }{\Vert \mathbf{u} \Vert }
 \left[
 \mathbf{I} - \hat{\mathbf{u}} \hat{\mathbf{u}}^T
 \right]
