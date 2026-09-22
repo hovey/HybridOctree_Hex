@@ -69,8 +69,8 @@ Based on the [README.md](https://github.com/CMU-CBML/HybridOctree_Hex/blob/main/
 
 The octree is *refined* at regions of high curvature and narrow thickness.
 
-* **Curvature Detection:** Gaussian curvature $G$ is calculated for surface points.  Five thresholds $\{0.5, 1, 2, 4, 8\}$ are used.  If a cell at level $l+4$ satisfies $G > G_{\rm{thresh}}[l]$, it is refined to level $l+5$.
-* **Narrow Region Detection:** Thickness $T$ is measured via ray-casting.  If $T < T_{\rm{thresh}}$ (thresholds: $\{16, 8, 4, 2, 1\}$), the cell is refined.
+* **Curvature Detection:** Gaussian curvature $G$ is calculated for surface points.  Five thresholds $\\{0.5, 1, 2, 4, 8\\}$ are used.  If a cell at level $l+4$ satisfies $G > G_{\rm{thresh}}[l]$, it is refined to level $l+5$.
+* **Narrow Region Detection:** Thickness $T$ is measured via ray-casting.  If $T < T_{\rm{thresh}}$ (thresholds: $\\{16, 8, 4, 2, 1\\}$), the cell is refined.
 
 The resulting octree levels for each octant typically range from **level 5 to 9**.
 
@@ -148,8 +148,8 @@ Let
 $$
 \text{sgn}(x) =
 \begin{cases}
--1 & \text{if } x < 0 \\
-0 & \text{if } x = 0 \\
+-1 & \text{if } x < 0 \\\\
+0 & \text{if } x = 0 \\\\
 1 & \text{if } x > 0 
 \end{cases}
 $$
@@ -234,7 +234,7 @@ The final step meshes the **buffer zone** by connecting core boundary points $\m
 * **Smart Laplacian Smoothing:** Performed every 1,000 iterations on the outermost two layers to speed up convergence.
 * **Energy Minimization:** A gradient-based method minimizes an energy function $E$:
 
-$$E := E_{\mathcal{S}}({\rm Geometry\;Fitting}) - E_{\rm{J}}({\rm Jacobian}) - E_{\rm SJ}(\rm{Scaled\;Jacobian})$$
+$$E := E_{\mathcal{S}}({\rm Geometry\\;Fitting}) - E_{\rm{J}}({\rm Jacobian}) - E_{\rm SJ}(\rm{Scaled\\;Jacobian})$$
 
 or, more compactly,
 
@@ -305,7 +305,7 @@ J
     \right]
     \cdot
     (\mathbf{c} - \mathbf{x})
-    \\
+    \\\\
 &= \left[
     (\mathbf{b} - \mathbf{x}) 
     \times
@@ -313,7 +313,7 @@ J
     \right]
     \cdot
     (\mathbf{a} - \mathbf{x})
-    \\
+    \\\\
 &= \left[
     (\mathbf{c} - \mathbf{x}) 
     \times
@@ -343,9 +343,9 @@ Finally, define a **vector area** of the faces meeting at node $\mathbf{x}$,
 $$
 \begin{align}
 \mathbf{n}_{ab} &:= \mathbf{u} \times \mathbf{v} 
-\\
+\\\\
 \mathbf{n}_{bc} &:= \mathbf{v} \times \mathbf{w}
-\\
+\\\\
 \mathbf{n}_{ca} &:= \mathbf{w} \times \mathbf{u}
 \end{align}
 $$
@@ -459,9 +459,9 @@ $$
     (\mathbf{c} - \mathbf{x})
     }{
     \Vert \mathbf{a} - \mathbf{x}\Vert 
-    \;
+    \\;
     \Vert \mathbf{b} - \mathbf{x}\Vert 
-    \;
+    \\;
     \Vert \mathbf{c} - \mathbf{x}\Vert 
     }
 $$
@@ -472,9 +472,9 @@ $$
 \hat{J} :=
 \frac{(\mathbf{u} \times \mathbf{v}) \cdot \mathbf{w}}{
     \Vert \mathbf{u}\Vert 
-    \;
+    \\;
     \Vert \mathbf{v}\Vert 
-    \;
+    \\;
     \Vert \mathbf{w}\Vert 
 }
 $$
@@ -484,9 +484,9 @@ The gradient requires the **quotient rule** to account for the changing edge len
 $$
 L :=
     \Vert \mathbf{u}\Vert 
-    \;
+    \\;
     \Vert \mathbf{v}\Vert 
-    \;
+    \\;
     \Vert \mathbf{w}\Vert 
 $$
 
@@ -496,9 +496,9 @@ $$
 \hat{J} :=
 \frac{(\mathbf{u} \times \mathbf{v}) \cdot \mathbf{w}}{
     \Vert \mathbf{u}\Vert 
-    \;
+    \\;
     \Vert \mathbf{v}\Vert 
-    \;
+    \\;
     \Vert \mathbf{w}\Vert 
 }
 = \frac{J}{L}
@@ -510,7 +510,7 @@ $$
 \nabla \hat{J} = 
 \frac{
 \left(
-\nabla J \; L \;-\; J \; \nabla L
+\nabla J \\; L \\;-\\; J \\; \nabla L
 \right)
 }{L^2}
 $$
@@ -521,7 +521,7 @@ $$
 \nabla_a \hat{J} = 
 \frac{
 \left(
-\nabla_a J \; L \;-\; J \; \nabla_a L
+\nabla_a J \\; L \\;-\\; J \\; \nabla_a L
 \right)
 }{L^2}
 $$
@@ -530,7 +530,7 @@ $$
 \nabla_b \hat{J} = 
 \frac{
 \left(
-\nabla_b J \; L \;-\; J \; \nabla_b L
+\nabla_b J \\; L \\;-\\; J \\; \nabla_b L
 \right)
 }{L^2}
 $$
@@ -539,7 +539,7 @@ $$
 \nabla_c \hat{J} = 
 \frac{
 \left(
-\nabla_c J \; L \;-\; J \; \nabla_c L
+\nabla_c J \\; L \\;-\\; J \\; \nabla_c L
 \right)
 }{L^2}
 $$
@@ -548,7 +548,7 @@ $$
 \nabla_x \hat{J} = 
 \frac{
 \left(
-\nabla_x J \; L \;-\; J \; \nabla_x L
+\nabla_x J \\; L \\;-\\; J \\; \nabla_x L
 \right)
 }{L^2}
 $$
@@ -559,9 +559,9 @@ where the length gradient terms are:
 $$
 \nabla_a L = 
     \Vert \mathbf{v}\Vert 
-    \;
+    \\;
     \Vert \mathbf{w}\Vert 
-    \;
+    \\;
     \frac{\mathbf{u}}{
     \Vert \mathbf{u}\Vert }
 $$
@@ -569,9 +569,9 @@ $$
 $$
 \nabla_b L = 
     \Vert \mathbf{w}\Vert 
-    \;
+    \\;
     \Vert \mathbf{u}\Vert 
-    \;
+    \\;
     \frac{\mathbf{v}}{
     \Vert \mathbf{v}\Vert }
 $$
@@ -579,9 +579,9 @@ $$
 $$
 \nabla_c L = 
     \Vert \mathbf{u}\Vert 
-    \;
+    \\;
     \Vert \mathbf{v}\Vert 
-    \;
+    \\;
     \frac{\mathbf{w}}{
     \Vert \mathbf{w}\Vert }
 $$
@@ -590,23 +590,23 @@ $$
 \nabla_x L = 
 - \left(
     \Vert \mathbf{v}\Vert 
-    \;
+    \\;
     \Vert \mathbf{w}\Vert 
-    \;
+    \\;
     \frac{\mathbf{u}}{
     \Vert \mathbf{u}\Vert }
 +
     \Vert \mathbf{w}\Vert 
-    \;
+    \\;
     \Vert \mathbf{u}\Vert 
-    \;
+    \\;
     \frac{\mathbf{v}}{
     \Vert \mathbf{v}\Vert }
 +
     \Vert \mathbf{u}\Vert 
-    \;
+    \\;
     \Vert \mathbf{v}\Vert 
-    \;
+    \\;
     \frac{\mathbf{w}}{
     \Vert \mathbf{w}\Vert }
 \right)
@@ -631,11 +631,11 @@ Then,
 $$
 \begin{align}
 \nabla_a \hat{J} &= \frac{\mathbf{n}_{bc}}{L} - \frac{\hat{J} \hat{\mathbf{u}}}{\Vert \mathbf{u}\Vert }
-\\
+\\\\
 \nabla_b \hat{J} &= \frac{\mathbf{n}_{ca}}{L} - \frac{\hat{J} \hat{\mathbf{v}}}{\Vert \mathbf{v}\Vert }
-\\
+\\\\
 \nabla_c \hat{J} &= \frac{\mathbf{n}_{ab}}{L} - \frac{\hat{J} \hat{\mathbf{w}}}{\Vert \mathbf{w}\Vert }
-\\
+\\\\
 \nabla_x \hat{J} &= 
 - \left[
     \left(
@@ -786,8 +786,8 @@ $$\mathbf{x}(t) = \mathbf{x}_0 + t \mathbf{d}$$
 
 where $\mathbf{d}$ is an arbitrary direction and $\mathbf{x}_0$ = $\mathbf{0}$, and the Jacobian functions take the forms
 
-* $J(t) = C_1 + C_2 \; t$ a linear function,
-* $\hat{J}(t) = \frac{C_1 + C_2\;t}{\sqrt{Q_1(t) Q_2(t) Q_3(t)}}$ a nonlinear curve, where $Q$ are quadratic polynomials
+* $J(t) = C_1 + C_2 \\; t$ a linear function,
+* $\hat{J}(t) = \frac{C_1 + C_2\\;t}{\sqrt{Q_1(t) Q_2(t) Q_3(t)}}$ a nonlinear curve, where $Q$ are quadratic polynomials
 
 #### Plot of Jacobian and Scaled Jacobian - Monte Carlo
 
@@ -811,7 +811,7 @@ One can define the quality energy for a single hexahedron $h$ by checking the si
 $$
 E_Q(h) = 
 \begin{cases} 
--\hat{J}(h) & \text{if } J(h) > \epsilon \quad {\rm positive/smoothing}\\
+-\hat{J}(h) & \text{if } J(h) > \epsilon \quad {\rm positive/smoothing}\\\\
 -J(h) & \text{if } J(h) \leq \epsilon \quad {\rm negative/untangling}
 \end{cases}
 $$
@@ -883,19 +883,19 @@ $$
 \begin{align}
 \mathbf{H}_{bc} = \left[\mathbf{u}\right]_{\times} \quad \quad
 \mathbf{H}_{cb} = - \left[\mathbf{u}\right]_{\times}
-\\
+\\\\
 \mathbf{H}_{ca} = \left[\mathbf{v}\right]_{\times} \quad \quad
 \mathbf{H}_{ac} = -\left[\mathbf{v}\right]_{\times}
-\\
+\\\\
 \mathbf{H}_{ab} = \left[\mathbf{w}\right]_{\times} \quad \quad
 \mathbf{H}_{ba} = -\left[\mathbf{w}\right]_{\times}
-\\
+\\\\
 \mathbf{H}_{ax} = \left[\mathbf{w}\right]_{\times} - \left[\mathbf{v}\right]_{\times} \quad \quad
 \mathbf{H}_{xa} = \left[\mathbf{v}\right]_{\times} - \left[\mathbf{w}\right]_{\times}
-\\
+\\\\
 \mathbf{H}_{bx} = \left[\mathbf{u}\right]_{\times} - \left[\mathbf{w}\right]_{\times} \quad \quad
 \mathbf{H}_{xb} = \left[\mathbf{w}\right]_{\times} - \left[\mathbf{u}\right]_{\times}
-\\
+\\\\
 \mathbf{H}_{cx} = \left[\mathbf{v}\right]_{\times} - \left[\mathbf{u}\right]_{\times} \quad \quad
 \mathbf{H}_{xc} = \left[\mathbf{u}\right]_{\times} - \left[\mathbf{v}\right]_{\times}
 \end{align}
@@ -921,7 +921,7 @@ $\hat{\mathbf{u}} = \frac{\mathbf{a} - \mathbf{x}}{\Vert \mathbf{a} - \mathbf{x}
 
 $$
 \mathbf{H}_{L,ax} = 
--\frac{\Vert \mathbf{v} \Vert \; \Vert \mathbf{w} \Vert }{\Vert \mathbf{u} \Vert }
+-\frac{\Vert \mathbf{v} \Vert \\; \Vert \mathbf{w} \Vert }{\Vert \mathbf{u} \Vert }
 \left[
 \mathbf{I} - \hat{\mathbf{u}} \hat{\mathbf{u}}^T
 \right]
