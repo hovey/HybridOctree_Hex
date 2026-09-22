@@ -146,7 +146,7 @@ Let
 * $\text{sgn}(x)$ is the signum function:
 
 $$
-\operatorname{sgn}(x) =
+\text{sgn}(x) =
 \begin{cases}
 -1 & \text{if } x < 0 \\
 0 & \text{if } x = 0 \\
